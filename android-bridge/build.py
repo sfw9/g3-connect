@@ -19,7 +19,8 @@ with zipfile.ZipFile(jar,'w')as z:
 dex=work/'dex';shutil.rmtree(dex,ignore_errors=True);dex.mkdir()
 run([tools/'d8','--release','--min-api','26','--lib',platform,'--output',dex,jar,deps/'tflite/classes.jar',deps/'tflite-api/classes.jar'])
 unsigned=work/'unsigned.apk'
-run([tools/'aapt2','link','-o',unsigned,'-I',platform,'--manifest',root/'AndroidManifest.xml','-A',root/'assets','--min-sdk-version','26','--target-sdk-version','35'])
+res=work/'res.zip';run([tools/'aapt2','compile','--dir',root/'res','-o',res])
+run([tools/'aapt2','link','-o',unsigned,'-I',platform,'--manifest',root/'AndroidManifest.xml','-A',root/'assets','--min-sdk-version','26','--target-sdk-version','35',res])
 with zipfile.ZipFile(unsigned,'a',zipfile.ZIP_DEFLATED)as z:
  for p in dex.glob('*.dex'):z.write(p,p.name)
  for p in (deps/'tflite/jni').glob('*/*.so'):z.write(p,'lib/'+str(p.relative_to(deps/'tflite/jni')))

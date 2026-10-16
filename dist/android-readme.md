@@ -87,3 +87,16 @@ Host tests execute the same pure Java classes shipped in the APK. They verify in
 - [OpenDash / KTM-Nav-GEN3](https://github.com/Pavanayi1/KTM-Nav-GEN3), MIT: bundled classifier, labels, training/preprocessing reference. No KTM Bluetooth protocol is used. Model class labels are translated by meaning into Ninebot icons, never passed through as IDs.
 - Model SHA-256: `381ee97edf5e7fb537ece6e34361114cdf6cac405c3025f655e9b98751fd507b`; float32 input `[1,96,96,3]`, output `[1,30]`. Re-training requires the upstream dataset and ML dependencies, not the Android build.
 - TensorFlow Lite / Lite API 2.14.0, Apache 2.0. License texts are in `licenses/` and embedded in the APK. JSON-java is used only by host tests; it is not packaged as a runtime dependency.
+
+## Beta 17: neue Oberfläche
+
+Die Android-App ist neu gestaltet; Bluetooth-, Kopplungs- und Navigationslogik sind unverändert.
+
+- Kopfzeile mit Verbindungsstatus (Offline, Verbindet, Koppeln, Verbunden, Navigation, Fehler). Während der Kopplung erscheint „Jetzt Power-Taste kurz drücken“ deutlich hervorgehoben.
+- Ein Hauptknopf je nach Zustand: Roller suchen, Mit letztem Roller verbinden, Abbrechen oder Verbindung trennen. Gefundene Roller erscheinen als Liste mit Signalstärke.
+- Einrichtungs-Checkliste: Bluetooth-Berechtigung, Benachrichtigungszugriff und (empfohlen) Akkuoptimierung, jeweils mit Haken oder direktem Knopf zur Einstellung.
+- Navigationskarte mit gezeichnetem Abbiegepfeil, Entfernung bis zum Abbiegen, Straße, Reststrecke und Restzeit des aktuellen Maps-Hinweises.
+- Beschleunigung (Stufe 1–3) und Reichweitenanzeige (Ein/Aus) als Auswahlknöpfe. Nach dem Verbinden liest die App beide Werte einmal aus und markiert den bestätigten Wert; Fehler erscheinen direkt unter den Knöpfen.
+- Kompaktes Protokoll (letzte Einträge, auf Wunsch alles), Hell-/Dunkelmodus nach Systemeinstellung, eigenes App-Symbol (adaptiv, auch als Themen-Symbol).
+
+`build.py` kompiliert dafür zusätzlich den Ordner `res/` mit `aapt2 compile`. Version: `0.8-beta17` (versionCode 8).
