@@ -1,5 +1,5 @@
 import {Ninebot} from './ninebot.js?v=10';
-import {installNavigation} from './navigation-ui.js?v=11';
+import {installNavigation} from './navigation-ui.js?v=12';
 import {hex} from './crypto.js?v=10';
 const $=id=>document.getElementById(id);
 const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null;
@@ -30,6 +30,7 @@ function update() {
   $('connect').disabled=busy||!supported;$('connect').textContent=connected?'Trennen':busy?'Verbindet …':'Verbinden';
   $('pair-again').disabled=busy||connected||!supported;
   $('connection-chip').textContent=connected?'Verbunden':busy?'Verbindet …':'Offline';
+  $('connection-chip').className='chip '+(connected?'online':busy?'busy':'offline');
   $('levels').disabled=!connected||busy||![1,2,3].includes(current);
   $('refresh').disabled=!connected||busy;
   $('read-display-diagnostics').disabled=!connected||busy;
@@ -66,7 +67,7 @@ async function connect(forcePairing=false) {
   log(forcePairing?'Neue Power-Kopplung gestartet. Gespeicherter Schlüssel wird für diesen Versuch übersprungen.':'Verbindungsversuch gestartet.');
   client=new Ninebot(log,title=>{
     if(title==='Getrennt'){reset();status('Verbindung getrennt','Du kannst den Roller erneut verbinden.');log('Verbindung getrennt.');update();}
-    else {if(!title.startsWith('Power-Taste'))log(title);status(title,title.startsWith('Power-Taste')?'Drücke jetzt die Power-Taste einmal kurz. Die App wartet auf die Bestätigung und übernimmt ihren selbst erzeugten Schlüssel.':'Der Pairing-Schlüssel wird von dieser App auf deinem Gerät verwaltet.');update();}
+    else {const power=title.startsWith('Power-Taste');if(!power)log(title);status(title,power?'Drücke jetzt die Power-Taste einmal kurz. Die App wartet auf die Bestätigung und übernimmt ihren selbst erzeugten Schlüssel.':'Der Pairing-Schlüssel wird von dieser App auf deinem Gerät verwaltet.',power?'attention':'');update();}
   },password=>rememberKey(hex(password)));
   try {
     // requestDevice must be invoked directly from this click, before unrelated await.

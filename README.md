@@ -162,3 +162,16 @@ Der neue Button „Manuell senden / Dauersenden …“ öffnet eine schlichte Ei
 Manuelles Senden funktioniert ohne Maps und ohne Benachrichtigungszugriff. Es pausiert die Maps-Automatik. Der eigene Stopp-Button, globaler Navigationsstopp und Trennung beenden den Modus; erneutes Aktivieren der Maps-Automatik übergibt nach Stop des manuellen Datensatzes wieder an Maps. Laufzeit und Sendetakt basieren auf monotoner Zeit. Alle Pakete bleiben auf derselben serialisierten, verschlüsselten GATT-Sitzung; keine Motorbefehle werden durch den manuellen Sender eingeführt.
 
 276 native Prüfungen bestehen. Zusätzliche Fälle prüfen Endlos-/Einmalmodus, Zeitlimit, Stopp ohne spätere Wiederholungen, Countdown, Komma-Eingaben, Grenzen und Moduswechsel sowie tatsächlich verschlüsselte TFT-Nutzdaten mit frei gewählter Straße/Richtung/Zeit/Distanz. APK gebaut und signiert. Die neue Eingabemaske und sichtbare Ausgabe müssen noch am Nutzergerät geprüft werden.
+
+## Neue Oberfläche
+
+Die Webapp hat eine neu gestaltete, mobil optimierte Oberfläche mit vier Bereichen: **Roller** (Verbinden, Beschleunigung, Reichweitenanzeige), **Navigation**, **Android** und **Logger**. Auf dem Handy liegt die Tab-Leiste unten, ab Tablet-Breite oben. Hell- und Dunkelmodus folgen der Systemeinstellung. Der zuletzt geöffnete Bereich wird gemerkt.
+
+- Beschleunigungsstufen als große Auswahlkacheln, Reichweitenanzeige als Schalter.
+- Die Aufforderung zum Drücken der Power-Taste wird beim Koppeln deutlich hervorgehoben.
+- Die Navigation zeigt einen Abbiegepfeil passend zum aktuellen Hinweis; die Eingabetaste startet die Zielsuche.
+- Neue Fehler im Log werden am Logger-Tab mit einem roten Punkt markiert.
+- Behoben: Die schematische Routenkarte wurde nie eingeblendet, weil `hidden` bei SVG-Elementen keine Eigenschaft ist.
+- Web-App-Manifest und Symbol: Die Seite lässt sich in Chrome zum Startbildschirm hinzufügen.
+
+Alle Element-IDs und die Bluetooth-/Navigationslogik sind unverändert; die vorhandenen Tests laufen weiter (`npm test`). Weiterhin werden keine externen Schriftarten oder Grafiken geladen.

@@ -1,5 +1,7 @@
 import {ROUTER,distance,parseCoordinates,makeRoute,locate,getJSON} from './navigation.js?v=10';
 import {createMapsBridge} from './maps-bridge.js?v=10';
+// SVG elements have no hidden property; toggle the attribute instead.
+const setHidden=(el,on)=>on?el.setAttribute('hidden',''):el.removeAttribute?.('hidden');
 const fmt=m=>m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`;
 export function installNavigation({getClient,isBusy,setBusy,log}){
  const $=id=>document.getElementById(id);
@@ -47,7 +49,7 @@ export function installNavigation({getClient,isBusy,setBusy,log}){
   return accuracy;
  }
  function draw(){
-  const svg=$('nav-map');if(!route){svg.hidden=true;return;}
+  const svg=$('nav-map');if(!route){setHidden(svg,true);return;}
   const coords=route.points,lat=coords[0][1]*Math.PI/180,sx=Math.cos(lat);
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   for(const p of coords){minX=Math.min(minX,p[0]*sx);maxX=Math.max(maxX,p[0]*sx);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
@@ -57,8 +59,8 @@ export function installNavigation({getClient,isBusy,setBusy,log}){
   $('nav-route-path').setAttribute('d',path);
   const start=xy(coords[0]),end=xy(coords.at(-1));
   for(const [name,v]of [['nav-route-start',start],['nav-route-end',end]]){$(name).setAttribute('cx',v[0]);$(name).setAttribute('cy',v[1]);}
-  const dot=$('nav-route-position');dot.hidden=!location;if(location){const v=xy(location);dot.setAttribute('cx',v[0]);dot.setAttribute('cy',v[1]);}
-  svg.hidden=false;
+  const dot=$('nav-route-position');setHidden(dot,!location);if(location){const v=xy(location);dot.setAttribute('cx',v[0]);dot.setAttribute('cy',v[1]);}
+  setHidden(svg,false);
  }
  function release(){
   active=false;activeDevice=null;googleMode=false;displayTesting=false;clearInterval(timer);timer=null;
@@ -181,7 +183,7 @@ export function installNavigation({getClient,isBusy,setBusy,log}){
    await exclusive(()=>getClient().startNavigation());
    const latest=maps.latest();if(!latest)throw new Error('Google-Maps-Hinweis nicht mehr verfügbar.');
    active=true;googleMode=true;activeDevice=getClient().device.id;mapsTotal=latest.remaining;sentInitial=false;
-   $('nav-map').hidden=true;say('Google Maps wird zum Display übertragen · experimentell.');log('Google-Maps-Displayübertragung gestartet.');
+   setHidden($('nav-map'),true);say('Google Maps wird zum Display übertragen · experimentell.');log('Google-Maps-Displayübertragung gestartet.');
    try{wake=await navigator.wakeLock?.request('screen');}catch{}
    timer=setInterval(()=>void tick(),1000);await tick();
   }catch(e){await stop(e.message);log(`Google Maps: ${e.message}`,'ERROR');}
