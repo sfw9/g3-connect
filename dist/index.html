@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Ninebot MAX G3: Bluetooth verbinden, Authentifizierung protokollieren, Beschleunigungsstufe ändern.">
+<title>Ninebot G3 – Logger</title>
+<link rel="stylesheet" href="style.css?v=10">
+<script type="module" src="app.js?v=16"></script>
+</head>
+<body>
+<h1>Ninebot G3 <small>Beta 16</small></h1>
+<section aria-labelledby="android-title">
+<h2 id="android-title">Google Maps direkt am Roller · Android-App</h2>
+<p><a href="g3-connect.apk?v=16" download>G3 Connect für Android herunterladen (APK · etwa 10 MB)</a></p>
+<ol>
+<li>APK installieren und G3 Connect öffnen (Android 8 oder neuer).</li>
+<li>Benachrichtigungszugriff und Bluetooth erlauben. Roller suchen, verbinden und bei der Aufforderung die Power-Taste kurz drücken.</li>
+<li>„Google Maps automatisch am G3 starten / beenden“ eingeschaltet lassen. In Google Maps eine Navigation starten; G3 Connect sendet die Hinweise direkt im Hintergrund.</li>
+</ol>
+<p>Neu in Beta 16: „Manuell senden / Dauersenden …“ erlaubt eigene Richtung, Straße, Abbiegedistanz, Restzeit und Reststrecke. Einmal senden oder jede Sekunde wiederholen; Sendedauer 0 = bis Stopp. Funktioniert auch ohne Google Maps.</p>
+<p>Seit Beta 15: Startmeldungen wie „Head towards …“ und unmittelbare Abbiegeanweisungen funktionieren ohne Meterangabe. Dunkle Navigationssymbole werden vor der Bilderkennung normalisiert. Live-Navigation lässt sich auch während der Fahrt fortsetzen.</p>
+<p>Seit Beta 14: Fehlt die Gesamt-Reststrecke, sendet die App fest 1337 km als Platzhalter. Abbiegepfeil und Entfernung bis zur Kurve bleiben aus Maps; Restfahrzeit wird bei Bedarf aus Ankunft minus Handy-Uhrzeit geschätzt.</p>
+<p>Seit Beta 12: kombinierte Hinweise wie „350 m · Turn right onto Aggerstraße“ werden aus dem Maps-Text erkannt. Bei fehlenden Angaben in der Android-App „Maps-Diagnose kopieren“ verwenden. Diese Diagnose enthält den Navigationstext und Straßennamen.</p>
+<p>Vor dem Losfahren verbinden und auf den ersten Pfeil warten. Chrome kann geschlossen bleiben. Kein Google-API-Schlüssel und keine zusätzliche Brücken-App erforderlich. Beschleunigung, Reichweitenanzeige, Displaytest und Logger sind in der App enthalten.</p>
+<p>Bei gesperrtem Benachrichtigungszugriff unter Android 13+: In den App-Infos „Eingeschränkte Einstellungen zulassen“. Ein Wechsel aus der alten G3 Maps Bridge ist als Update möglich; die App heißt danach G3 Connect.</p>
+<p class="note">Neue Android-Beta: gebaut und mit simuliertem Roller geprüft, noch nicht auf einem Android-Gerät getestet. Die TFT-Pakete funktionieren laut deinem Test; die Erkennung der Google-Maps-Hinweise muss auf deinem Handy geprüft werden. Nicht erkennbare oder fehlende Hinweise stoppen die Display-Übertragung. <a href="g3-connect-android-source.zip" download>Android-Quellcode und Lizenzen</a> · <a href="android-readme.md">Einrichtung und Grenzen</a></p>
+</section>
+<div class="row">
+<button id="connect">Verbinden</button>
+<button id="pair-again">Neu koppeln (Power-Taste)</button>
+<button id="cancel-pairing" hidden>Abbrechen</button>
+<span id="connection-chip">Offline</span>
+</div>
+<p id="connection-hint">Roller einschalten, Segway-App schließen. Nach BLE-/Firmware-Wechsel „Neu koppeln“ wählen und erst bei der Aufforderung die Power-Taste kurz drücken. Der bisherige Browser-Schlüssel wird erst nach bestätigter neuer Kopplung ersetzt.</p>
+<div id="status-box" role="status" aria-live="polite">
+<strong id="status-title">Bereit</strong>
+<span id="status-detail">Chrome/Edge mit Web Bluetooth über HTTPS oder localhost erforderlich.</span>
+</div>
+<p><span id="device-name">Kein Gerät</span> · <span id="device-caption">Nicht verbunden</span></p>
+
+<fieldset id="levels" disabled>
+<legend>Beschleunigung im Sportmodus</legend>
+<label><input type="radio" name="level" value="1"> Stufe 1</label>
+<label><input type="radio" name="level" value="2"> Stufe 2</label>
+<label><input type="radio" name="level" value="3"> Stufe 3</label>
+</fieldset>
+<div class="row"><button id="apply" disabled>Übernehmen</button>
+<button id="refresh" disabled>Auslesen</button></div>
+<p>Aktuell: <span id="current-level">—</span>. <span id="read-status">Noch nicht ausgelesen.</span></p>
+
+<section aria-labelledby="display-title">
+<h2 id="display-title">Reichweitenanzeige am Roller</h2>
+<p><label><input id="range-enabled" type="checkbox" disabled> Reichweite auf dem Roller-Display anzeigen</label></p>
+<div class="row"><button id="apply-range" disabled>Anzeige übernehmen</button>
+<button id="read-range" disabled>Anzeige auslesen</button></div>
+<p id="range-state" role="status" aria-live="polite">Noch nicht ausgelesen.</p>
+<p id="range-capability"></p>
+<p>Zuordnung aus der offiziellen G3-App-Konfiguration. Rücklesen bestätigt den gespeicherten Wert; die sichtbare Wirkung bitte am Roller prüfen. Auch bei ausgeblendetem Segway-Schalter bedienbar.</p>
+<button id="read-display-diagnostics" disabled>Display-Diagnose lesen</button>
+<p>Erfasst Firmwareversionen und Display-Einstellungen zur Zuordnung. Liest ausschließlich; die Anzeige am Roller wird dabei nicht verändert. Das Ergebnis ist im JSON-Diagnose-Download enthalten.</p>
+<pre id="display-diagnostic-output"></pre>
+</section>
+
+<section aria-labelledby="navigation-title">
+<h2 id="navigation-title">Navigation</h2>
+<p>Ziel suchen, Fahrradroute berechnen und Abbiegehinweise verfolgen. Für GPS und Bluetooth den Browser im Vordergrund lassen.</p>
+<div class="row"><button id="nav-location">Standort erfassen</button><span id="nav-position">Standort noch nicht erfasst.</span></div>
+<p><label for="nav-query">Zieladresse oder Koordinaten (Breite, Länge)</label><br><input id="nav-query" type="text" autocomplete="off" placeholder="z. B. Bahnhof, Stadt"></p>
+<div class="row"><button id="nav-find">Ziel suchen</button><button id="nav-plan" disabled>Fahrradroute berechnen</button></div>
+<p><label for="nav-results">Gefundenes Ziel</label><br><select id="nav-results" size="3" aria-label="Gefundene Ziele"></select></p>
+<p id="nav-route-summary"></p>
+<svg id="nav-map" viewBox="0 0 480 240" role="img" aria-label="Schematischer Verlauf der geplanten Route. Grün: Start, Rot: Ziel, Blau: Standort." hidden>
+<path id="nav-route-path" fill="none" stroke="#555" stroke-width="3"></path>
+<circle id="nav-route-start" r="5" fill="green"></circle><circle id="nav-route-end" r="5" fill="#b00020"></circle><circle id="nav-route-position" r="5" fill="#1463bf"></circle>
+</svg>
+<p><strong id="nav-instruction">Noch keine Route.</strong><br><span id="nav-road"></span><br><span id="nav-remaining"></span></p>
+<div class="row"><button id="nav-phone" disabled>Auf Handy starten</button><button id="nav-start" disabled>Mit G3-Display starten</button><button id="nav-stop" disabled>Navigation beenden</button></div>
+<p id="nav-status" role="status" aria-live="polite">Standort erfassen und Ziel wählen.</p>
+<details>
+<summary>G3-Display testen · experimentell</summary>
+<p>Das Startformat für Pfeilnavigation stammt aus der Hersteller-App. Die sichtbare Wirkung am G3 bleibt zu prüfen. Im Stillstand testen. Der Test sendet 15 Sekunden lang jede Sekunde einen Linkspfeil mit 100 m und endet danach. Dies ist keine echte Route. Ein Startton allein bestätigt keine Anzeige. Erst bei sichtbarem Test die Display-Navigation freischalten.</p>
+<button id="nav-test" disabled>Displaytest senden</button>
+<p><label><input id="nav-verified" type="checkbox" disabled> Test am Display sichtbar: Linkspfeil mit 100 m</label></p>
+<p>Bei einem Timeout die Diagnose als JSON speichern. Es werden keine alternativen Startformate automatisch ausprobiert. <a href="navigation-analysis.md">Protokoll und Grenzen</a></p>
+</details>
+<p class="note">Zielsuche sendet die Suchanfrage an OpenStreetMap Nominatim; die Routenberechnung sendet Start und Ziel an routing.openstreetmap.de. Laufende GPS-Positionen bleiben auf deinem Gerät. Fahrradroute: örtliche Freigaben prüfen. Keine automatische Neuberechnung. Daten © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap-Mitwirkende</a>.</p>
+</section>
+
+<section aria-labelledby="logger-title">
+<h2 id="logger-title">Logger <small id="log-count">0 Einträge</small></h2>
+<div class="row">
+<button id="copy-log">Kopieren</button>
+<button id="download-log">Als Text speichern</button>
+<button id="download-json">Diagnose als JSON</button>
+<button id="clear-log">Leeren</button>
+<label><input id="auto-scroll" type="checkbox" checked> Automatisch scrollen</label>
+</div>
+<textarea id="log" rows="23" readonly spellcheck="false" aria-label="Bluetooth- und Authentifizierungsprotokoll"></textarea>
+<p id="log-feedback" role="status" aria-live="polite">Keine Schlüssel oder Nutzdaten im Log.</p>
+</section>
+
+<details>
+<summary>Verbindungseinstellungen</summary>
+<p><label><input id="remember-pairing" type="checkbox" checked> Kopplung in diesem Browser merken</label></p>
+<p><label for="name-override">Bluetooth-Name, falls verkürzt (optional)</label><br><input id="name-override" autocomplete="off" spellcheck="false"></p>
+<p><label for="pairing-key">Vorhandener Pairing-Schlüssel (optional; sonst selbst erzeugt)</label><br><input id="pairing-key" type="password" maxlength="32" autocomplete="off" spellcheck="false"> <button id="reveal-key">Anzeigen</button></p>
+<button id="save-key" hidden>Pairing-Schlüssel sichern</button>
+<p id="new-key-hint" hidden>Der Roller hat den erzeugten Schlüssel angenommen. Sicherung privat aufbewahren.</p>
+</details>
+<p class="note">Beschleunigungswerte 1–3: Community-Protokoll, am echten Roller nicht verifiziert. <a href="README.md">Dokumentation</a></p>
+</body>
+</html>

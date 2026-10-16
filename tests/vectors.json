@@ -1,0 +1,20 @@
+[
+  {
+    "gen2": true,
+    "pre": "5aa5003e045b00",
+    "preEncrypted": "5aa500aac9c778000062ff0000",
+    "plain": "5aa5023e16026e0300",
+    "encrypted": "5aa5026a8e1f7a51ce808f068b0002",
+    "multi": "5aa520043e5b01000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "multiEncrypted": "5aa520ede325e06c50e51a624d1169cffb7afe741ab87fa8995b383de7dd336ab4817c1d85231e6dcf88340003"
+  },
+  {
+    "gen2": false,
+    "pre": "5ab5003e045b00",
+    "preEncrypted": "5ab500f7991b58000062ff0000",
+    "plain": "5ab5023e16026e0300",
+    "encrypted": "5ab5026a8e1f7a51ce199b982e0002",
+    "multi": "5ab520043e5b01000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "multiEncrypted": "5ab520ede325e06c50e51a624d1169cffb7afe741ab87fa8995b383de7dd336ab4817c1d85231e001d3ea10003"
+  }
+]

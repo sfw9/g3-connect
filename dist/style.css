@@ -1,0 +1,21 @@
+body { max-width: 1000px; margin: 20px auto; padding: 0 12px; font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+h2 { font-size: 16px; margin: 16px 0 8px; }
+small, .note, #log-feedback { color: #555; font-size: 12px; font-weight: normal; }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+button, input { font: inherit; }
+button { padding: 4px 9px; cursor: pointer; }
+button:disabled { cursor: default; }
+fieldset { margin: 12px 0; }
+fieldset label { display: inline-block; margin-right: 12px; }
+#log { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 0; padding: 8px; font: 12px/1.5 monospace; resize: vertical; background: #fafafa; color: #111; }
+#status-detail { display: block; }
+.error #status-title { color: #a00000; }
+.success #status-title { color: #006b23; }
+summary { cursor: pointer; }
+#pairing-key, #name-override { max-width: 100%; box-sizing: border-box; width: 340px; }
+[hidden] { display: none !important; }
+
+#display-diagnostic-output { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+#nav-query, #nav-results { width: 100%; max-width: 620px; box-sizing: border-box; font: inherit; }
+#nav-map { display: block; width: 100%; max-width: 620px; border: 1px solid #ccc; }

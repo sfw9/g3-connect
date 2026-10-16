@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="de.g3connect.maps" android:versionCode="7" android:versionName="0.7-beta16">
+<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+<queries><package android:name="com.google.android.apps.maps" /></queries>
+<application android:label="G3 Connect (Beta)" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:supportsRtl="true" android:extractNativeLibs="true">
+<activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+<service android:name=".ConnectService" android:exported="false" android:foregroundServiceType="connectedDevice" />
+<service android:name=".MapsListener" android:label="Google-Maps-Hinweise für G3 Connect" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true"><intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter></service>
+</application>
+</manifest>
