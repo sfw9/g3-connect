@@ -175,3 +175,13 @@ Die Webapp hat eine neu gestaltete, mobil optimierte Oberfläche mit vier Bereic
 - Web-App-Manifest und Symbol: Die Seite lässt sich in Chrome zum Startbildschirm hinzufügen.
 
 Alle Element-IDs und die Bluetooth-/Navigationslogik sind unverändert; die vorhandenen Tests laufen weiter (`npm test`). Weiterhin werden keine externen Schriftarten oder Grafiken geladen.
+
+## Deployment auf Vercel
+
+Das Repo ist direkt auf Vercel deploybar: Projekt importieren, keine Einstellungen ändern (Framework „Other“, Root Directory leer lassen). Die `vercel.json` legt fest:
+
+- Ausgabeverzeichnis ist `dist/` – nur die Webapp wird veröffentlicht, nicht die Android-Quellen oder Tests.
+- Kein Install-Schritt (keine Abhängigkeiten); als Build laufen die Tests (`npm test`). Schlägt ein Test fehl, wird nicht deployt.
+- `g3-connect.apk` wird mit dem richtigen Dateityp als Download ausgeliefert.
+
+Vercel liefert automatisch HTTPS, das Web Bluetooth voraussetzt.
