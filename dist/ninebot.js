@@ -6,8 +6,12 @@ const encoder=new TextEncoder(),decoder=new TextDecoder();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 export class Ninebot {
   constructor(log=()=>{},status=()=>{},onPairingKey=()=>{}) {this.log=log;this.status=status;this.onPairingKey=onPairingKey;this.pending=null;this.authenticated=false;this.listeners=[];this.rxChain=Promise.resolve();this.buffer=new FrameBuffer();this.session=0;}
-  async choose() {
-    this.device=await navigator.bluetooth.requestDevice({filters:[{services:[NORDIC]},{services:[CUSTOM]},{namePrefix:'1C'}],optionalServices:[NORDIC,CUSTOM,'generic_access']});
+  async choose(all=false) {
+    // Ninebot scooters are matched by their BLE services; '1C' is the G3 serial prefix.
+    // Other models with the same dashboard (e.g. F3 Pro D / F3 D) may advertise neither,
+    // so the user can fall back to listing every device.
+    const optionalServices=[NORDIC,CUSTOM,'generic_access'];
+    this.device=await navigator.bluetooth.requestDevice(all?{acceptAllDevices:true,optionalServices}:{filters:[{services:[NORDIC]},{services:[CUSTOM]},{namePrefix:'1C'}],optionalServices});
     return this.device;
   }
   async connect(passwordHex='',nameOverride='',{forcePairing=false}={}) {
@@ -86,6 +90,7 @@ export class Ninebot {
       name=decoder.decode(await ch.readValue()).replaceAll('\0','').trim() || name;
     }catch{/* Some browsers block the GAP service; advertised name remains available. */}
     if(!name) throw new Error('Gerätename fehlt. Trage den vollständigen Bluetooth-Namen ein.');
+    this.deviceName=name;
     this.status('Authentifizierung läuft …');
     // G3 confirmed in ha-ninebot uses Gen2/Nordic; try documented Gen3 only if no PRE_COMM response.
     const options=[{gen2:true,sync:0xa5,write:'6e400002-b5a3-f393-e0a9-e50e24dcca9e'}, {gen2:false,sync:0xb5,write:'6e400002-0000-0000-006e-696e65626f74'}];

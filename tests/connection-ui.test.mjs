@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Ninebot} from '../dist/ninebot.js?v=10';
+import {Ninebot} from '../dist/ninebot.js?v=11';
 
 class Element extends EventTarget {
  constructor(){super();this.value='';this.dataset={};this.disabled=false;this.hidden=false;this.checked=false;this.textContent='';}

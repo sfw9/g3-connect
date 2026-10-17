@@ -7,7 +7,7 @@ import java.util.concurrent.*;
 import java.io.IOException;
 /** One GATT instance per session; callbacks never run the blocking protocol worker. */
 final class BleWire implements NinebotClient.Wire {
- private static final UUID SERVICE=UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e"),TX=UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e"),RX=UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e"),CCCD=UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+ private static final UUID SERVICE=UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e"),TX=UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e"),RX=UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e"),CCCD=UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"),NINEBOT=UUID.fromString("6e400001-0000-0000-006e-696e65626f74");
  private final BlockingQueue<byte[]> incoming=new LinkedBlockingQueue<>();private final NinebotCrypto.Frames frames=new NinebotCrypto.Frames();
  private final CountDownLatch connected=new CountDownLatch(1),mtuDone=new CountDownLatch(1),discovered=new CountDownLatch(1),subscribed=new CountDownLatch(1);
  private volatile CountDownLatch written;private volatile BluetoothGatt gatt;private BluetoothGattCharacteristic tx;private volatile int mtu=23;private volatile String failure;private volatile boolean closed;private volatile int writeStatus;
@@ -24,7 +24,7 @@ final class BleWire implements NinebotClient.Wire {
  BleWire(Context context,BluetoothDevice device){gatt=device.connectGatt(context,false,callback,BluetoothDevice.TRANSPORT_LE);if(gatt==null)fail("GATT konnte nicht gestartet werden.");}
  void open()throws Exception {
   waitFor(connected,12000);if(!gatt.requestMtu(185))throw new IOException("MTU-Anfrage abgelehnt.");waitFor(mtuDone,6000);if(mtu<34)throw new IOException("Bluetooth-MTU zu klein für Navigationsdaten: "+mtu);
-  if(!gatt.discoverServices())throw new IOException("Service-Suche nicht gestartet.");waitFor(discovered,8000);BluetoothGattService service=gatt.getService(SERVICE);if(service==null)throw new IOException("Nordic UART fehlt. Dieser BLE-Dienst wird noch nicht unterstützt.");
+  if(!gatt.discoverServices())throw new IOException("Service-Suche nicht gestartet.");waitFor(discovered,8000);BluetoothGattService service=gatt.getService(SERVICE);if(service==null)throw new IOException(gatt.getService(NINEBOT)!=null?"Dieser Roller nutzt den neueren Ninebot-BLE-Dienst. Die Android-App unterstützt bisher nur Nordic UART (wie beim G3); bitte die Web-App verwenden.":"Nordic UART fehlt. Dieser BLE-Dienst wird noch nicht unterstützt.");
   tx=service.getCharacteristic(TX);BluetoothGattCharacteristic rx=service.getCharacteristic(RX);if(tx==null||rx==null)throw new IOException("UART-Characteristics fehlen.");
   if(!gatt.setCharacteristicNotification(rx,true))throw new IOException("Notifications abgelehnt.");BluetoothGattDescriptor descriptor=rx.getDescriptor(CCCD);if(descriptor==null)throw new IOException("Notification-Descriptor fehlt.");
   boolean queued;if(Build.VERSION.SDK_INT>=33)queued=gatt.writeDescriptor(descriptor,BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)==BluetoothStatusCodes.SUCCESS;else{descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);queued=gatt.writeDescriptor(descriptor);}if(!queued)throw new IOException("Notification-Abo nicht gestartet.");waitFor(subscribed,5000);

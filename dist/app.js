@@ -1,4 +1,4 @@
-import {Ninebot} from './ninebot.js?v=10';
+import {Ninebot} from './ninebot.js?v=11';
 import {installNavigation} from './navigation-ui.js?v=12';
 import {hex} from './crypto.js?v=10';
 const $=id=>document.getElementById(id);
@@ -23,6 +23,11 @@ function log(message,level='INFO') {
   if($('auto-scroll').checked)$('log').scrollTop=$('log').scrollHeight;
 }
 
+// Register meanings (acceleration 0x6E, range display 0x2F bit 4) come from the official G3
+// configuration. Other models such as the F3 share the display but are read-only here.
+const modelName=()=>/^1C/i.test(client?.deviceName||client?.device?.name||'')?'Ninebot MAX G3':'Anderes Ninebot-Modell (z. B. F3)';
+const writable=()=>modelName()==='Ninebot MAX G3';
+const READ_ONLY='Nur Lesen: Die Register-Zuordnung ist für dieses Modell nicht bestätigt, daher sind Änderungen gesperrt.';
 function status(title,detail='',kind='') {$('status-title').textContent=title;$('status-detail').textContent=detail;$('status-box').className=kind;}
 function selected(){return Number(document.querySelector('input[name=level]:checked')?.value)||null;}
 function update() {
@@ -31,13 +36,13 @@ function update() {
   $('pair-again').disabled=busy||connected||!supported;
   $('connection-chip').textContent=connected?'Verbunden':busy?'Verbindet …':'Offline';
   $('connection-chip').className='chip '+(connected?'online':busy?'busy':'offline');
-  $('levels').disabled=!connected||busy||![1,2,3].includes(current);
+  $('levels').disabled=!connected||busy||![1,2,3].includes(current)||!writable();
   $('refresh').disabled=!connected||busy;
   $('read-display-diagnostics').disabled=!connected||busy;
   $('read-range').disabled=!connected||busy;
-  $('range-enabled').disabled=!connected||busy||!rangeDisplay;
-  $('apply-range').disabled=!connected||busy||!rangeDisplay||$('range-enabled').checked===rangeDisplay.enabled;
-  $('apply').disabled=!connected||busy||![1,2,3].includes(current)||!selected()||selected()===current;
+  $('range-enabled').disabled=!connected||busy||!rangeDisplay||!writable();
+  $('apply-range').disabled=!connected||busy||!rangeDisplay||!writable()||$('range-enabled').checked===rangeDisplay.enabled;
+  $('apply').disabled=!connected||busy||![1,2,3].includes(current)||!writable()||!selected()||selected()===current;
   $('cancel-pairing').hidden=!busy||!client?.device;
   $('pairing-key').disabled=busy||connected;$('name-override').disabled=busy||connected;
   navigation?.update();
@@ -46,7 +51,7 @@ function reset() {current=null;setRangeCurrent(null);$('current-level').textCont
 function setRangeCurrent(value) {
   rangeDisplay=value;$('range-enabled').checked=!!value?.enabled;
   $('range-state').textContent=value?`Vom Roller gelesen: Reichweitenanzeige ${value.enabled?'ein':'aus'}.`:'Noch nicht ausgelesen.';
-  $('range-capability').textContent=value&&!value.advertised?'Der Roller meldet den Segway-Schalter als ausgeblendet. Die Einstellung lässt sich hier direkt ansprechen; die Wirkung kann bei LC abweichen.':'';
+  $('range-capability').textContent=value&&!writable()?READ_ONLY:value&&!value.advertised?'Der Roller meldet den Segway-Schalter als ausgeblendet. Die Einstellung lässt sich hier direkt ansprechen; die Wirkung kann bei LC abweichen.':'';
 }
 function setCurrent(value) {
   current=value;$('current-level').textContent=[1,2,3].includes(value)?`Stufe ${value}`:`Unbekannter Wert: ${value}`;
@@ -55,7 +60,8 @@ function setCurrent(value) {
 }
 async function refresh() {
   const level=await client.readAcceleration();setCurrent(level);log(`Beschleunigungsregister gelesen: ${level}.`);
-  $('device-caption').textContent=client.generation;
+  $('device-caption').textContent=`${modelName()} · ${client.generation}`;
+  if(!writable()&&[1,2,3].includes(level))$('read-status').textContent=READ_ONLY;
   if(![1,2,3].includes(level))status('Änderungen gesperrt','Der Roller meldet einen unbekannten Stufenwert. Diese Firmware wird für Änderungen nicht unterstützt.','error');
 }
 async function connect(forcePairing=false) {
@@ -71,10 +77,11 @@ async function connect(forcePairing=false) {
   },password=>rememberKey(hex(password)));
   try {
     // requestDevice must be invoked directly from this click, before unrelated await.
-    await client.choose();log('Bluetooth-Gerät ausgewählt.');$('device-name').textContent=client.device.name||'Ninebot MAX G3';
+    await client.choose($('show-all-devices').checked);log('Bluetooth-Gerät ausgewählt.');$('device-name').textContent=client.device.name||'Ninebot-Roller';
     const enteredKey=(!$('pairing-key').dataset.device || $('pairing-key').dataset.device===client.device.id)?key:'';
     await client.connect(forcePairing?'':enteredKey||rememberedKey(client.device.id),$('name-override').value,{forcePairing});
-    $('device-name').textContent=client.device.name||'Ninebot MAX G3';
+    $('device-name').textContent=client.device.name||'Ninebot-Roller';
+    if(!writable())log('Kein G3-Name (1C…): Navigation verfügbar, Einstellungen nur lesend.');
     status('Roller verbunden','Verschlüsselte Verbindung hergestellt. Beschleunigungsstufe wird gelesen.','success');
     await refresh();
     if([1,2,3].includes(current))status('Bereit für deine Einstellung','Wähle eine Stufe. Beim Übernehmen prüft die App den Stillstand und liest den neuen Wert zurück. Die Stufenzuordnung bitte beim ersten Einsatz in der Segway-App vergleichen.','success');

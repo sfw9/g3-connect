@@ -10,7 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 /** User-started connected-device foreground service; stays active while Maps is in front. */
 public final class ConnectService extends Service {
- static volatile ConnectService instance;static volatile String status="Nicht verbunden.";static volatile boolean connected,armed=true,manualActive;static volatile String manualStatus="Manuelles Senden aus.";
+ static volatile ConnectService instance;static volatile String status="Nicht verbunden.";static volatile boolean connected,armed=true,manualActive;static volatile String manualStatus="Manuelles Senden aus.",deviceName="";
  private static final StringBuilder LOG=new StringBuilder();
  static synchronized void log(String value){String clean=value.replaceAll("(?i)[0-9a-f]{32,}","[entfernt]");LOG.append(new SimpleDateFormat("HH:mm:ss.SSS",Locale.ROOT).format(new Date())).append(" ").append(clean).append('\n');if(LOG.length()>28000)LOG.delete(0,LOG.indexOf("\n",LOG.length()-24000)+1);}
  static synchronized String logs(){return LOG.toString();}
@@ -27,7 +27,7 @@ public final class ConnectService extends Service {
   worker.scheduleWithFixedDelay(()->tick(),1000,1000,TimeUnit.MILLISECONDS);
  }
  @Override public int onStartCommand(Intent intent,int flags,int id){if(intent==null){stopSelf();return START_NOT_STICKY;}String action=intent.getAction();if("disconnect".equals(action)){disconnect();return START_NOT_STICKY;}if("connect".equals(action)&&!connecting&&!connected&&!closing){connecting=true;String address=intent.getStringExtra("address"),name=intent.getStringExtra("name");boolean force=intent.getBooleanExtra("force",false);worker.execute(()->connect(address,name,force));}return START_NOT_STICKY;}
- private void connect(String address,String name,boolean force){try{
+ private void connect(String address,String name,boolean force){deviceName=name==null?"":name;try{
    getSharedPreferences("g3",MODE_PRIVATE).edit().putString("device",address).putString("name",name).apply();String stored=getSharedPreferences("g3",MODE_PRIVATE).getString("pair:"+address,null);byte[] key=force||stored==null?null:Base64.decode(stored,Base64.NO_WRAP);
    try{open(address,name,key);}catch(Exception first){if(key==null||closing)throw first;log("Gespeicherte Kopplung fehlgeschlagen. Frische GATT-Sitzung für Power-Kopplung.");if(wire!=null)wire.close();open(address,name,null);}
    if(closing)return;connected=true;status="Verbunden · Maps-Automatik "+(armed?"bereit":"aus");log(status);

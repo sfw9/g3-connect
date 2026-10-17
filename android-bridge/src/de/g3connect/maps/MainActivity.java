@@ -30,9 +30,13 @@ public final class MainActivity extends Activity {
  private LinearLayout statusBox,secondaryRow,devices,scanRow,maneuver,setupBody;private TurnIcon turn;private Switch automatic;
  private final TextView[] levels=new TextView[3],ranges=new TextView[2];private final List<View> needsConnection=new ArrayList<>();
  private Step bluetoothStep,listenerStep,batteryStep;private boolean logExpanded,wasConnected;private String shownLog="";private int primaryMode;
- private BluetoothLeScanner scanner;private boolean scanning;private final Set<String> seen=new HashSet<>();private final Handler handler=new Handler(Looper.getMainLooper());
+ private BluetoothLeScanner scanner;private boolean scanning,showAll,searched;private TextView showAllButton;private final Set<String> seen=new HashSet<>();private final Handler handler=new Handler(Looper.getMainLooper());
  private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,1000);}};
  private final ScanCallback scan=new ScanCallback(){@Override public void onScanResult(int type,ScanResult result){runOnUiThread(()->found(result));}@Override public void onScanFailed(int code){runOnUiThread(()->{scanning=false;notice("Bluetooth-Suche fehlgeschlagen: "+code);render();});}};
+ private static final android.os.ParcelUuid NORDIC=android.os.ParcelUuid.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e"),NINEBOT=android.os.ParcelUuid.fromString("6e400001-0000-0000-006e-696e65626f74");
+ /** Register meanings (0x6E, 0x2F bit 4) come from the official G3 configuration; other models such as the F3 are read-only. */
+ private static boolean isG3(String name){return name!=null&&name.startsWith("1C");}
+ private static boolean writable(){return isG3(ConnectService.deviceName);}
  private static final class Step {String number;TextView badge,title,sub,action;}
 
  @Override public void onCreate(Bundle saved){
@@ -61,7 +65,7 @@ public final class MainActivity extends Activity {
   LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(8),0,dp(4));column.addView(row);
   TextView logo=text("G3",15,ON_ACCENT,Typeface.DEFAULT_BOLD);logo.setGravity(Gravity.CENTER);logo.setBackground(shape(ACCENT,12,0));row.addView(logo,new LinearLayout.LayoutParams(dp(42),dp(42)));
   LinearLayout titles=vertical();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(12);row.addView(titles,lp);
-  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot MAX G3 · Android Beta 17",12.5f,MUTED,null));
+  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot G3 · F3 · Android Beta 17",12.5f,MUTED,null));
   chip=text("Offline",13,MUTED,medium());chip.setPadding(dp(12),dp(6),dp(12),dp(6));chip.setCompoundDrawablePadding(dp(8));row.addView(chip);
  }
 
@@ -70,12 +74,13 @@ public final class MainActivity extends Activity {
   LinearLayout card=card(column);title(card,"Roller",null);
   statusBox=vertical();statusBox.setPadding(dp(14),dp(12),dp(14),dp(12));add(card,statusBox,12);
   statusTitle=text("",15.5f,TEXT,medium());statusBox.addView(statusTitle);statusDetail=text("",13.5f,MUTED,null);statusBox.addView(statusDetail);
-  primary=button("Roller suchen",PRIMARY,()->{if(primaryMode==0)disconnect();else if(primaryMode==1)last(false);else search();});primary.setMinHeight(dp(54));primary.setTextSize(TypedValue.COMPLEX_UNIT_SP,16);add(card,primary,14);
-  secondaryRow=row(card,8);search=button("Roller suchen",SECONDARY,this::search);cell(secondaryRow,search);repair=button("Neu koppeln",SECONDARY,()->last(true));cell(secondaryRow,repair);
+  primary=button("Roller suchen",PRIMARY,()->{if(primaryMode==0)disconnect();else if(primaryMode==1)last(false);else{showAll=false;search();}});primary.setMinHeight(dp(54));primary.setTextSize(TypedValue.COMPLEX_UNIT_SP,16);add(card,primary,14);
+  secondaryRow=row(card,8);search=button("Roller suchen",SECONDARY,()->{showAll=false;search();});cell(secondaryRow,search);repair=button("Neu koppeln",SECONDARY,()->last(true));cell(secondaryRow,repair);
   scanRow=new LinearLayout(this);scanRow.setGravity(Gravity.CENTER_VERTICAL);add(card,scanRow,14);
   ProgressBar spinner=new ProgressBar(this,null,android.R.attr.progressBarStyleSmall);spinner.setIndeterminateTintList(ColorStateList.valueOf(ACCENT));scanRow.addView(spinner,new LinearLayout.LayoutParams(dp(20),dp(20)));
   scanLabel=text("Suche nach G3 in der Nähe …",14,MUTED,null);scanLabel.setPadding(dp(10),0,0,0);scanRow.addView(scanLabel);
   devices=vertical();add(card,devices,4);
+  showAllButton=button("Roller nicht dabei? Alle Geräte zeigen",SECONDARY,()->{showAll=true;search();});showAllButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,13.5f);showAllButton.setMinHeight(dp(40));add(card,showAllButton,8);
   hint(card,"Roller einschalten und die Segway-App schließen. Bei „Neu koppeln“ erst auf Aufforderung die Power-Taste kurz drücken.",12);
  }
 
@@ -188,6 +193,7 @@ public final class MainActivity extends Activity {
   secondaryRow.setVisibility(!online&&hasLast()?View.VISIBLE:View.GONE);
   enable(search,!scanning);
   scanRow.setVisibility(scanning?View.VISIBLE:View.GONE);devices.setVisibility(online?View.GONE:View.VISIBLE);
+  showAllButton.setVisibility(!online&&!showAll&&(scanning||searched)?View.VISIBLE:View.GONE);
   // Einrichtung
   boolean bt=allowed(),listener=MapsState.listenerReady,battery=batteryUnrestricted();
   stepState(bluetoothStep,bt);stepState(listenerStep,listener);stepState(batteryStep,battery);
@@ -204,9 +210,11 @@ public final class MainActivity extends Activity {
   manualState.setText(ConnectService.manualStatus);manualStop.setVisibility(ConnectService.manualActive?View.VISIBLE:View.GONE);
   // Einstellungen
   for(View v:needsConnection)enable(v,connected);
+  for(View v:levels)enable(v,connected&&writable());for(View v:ranges)enable(v,connected&&writable());
   for(int i=0;i<3;i++)style(levels[i],knownLevel==i+1?SELECTED:SECONDARY);
   style(ranges[0],knownRange==1?SELECTED:SECONDARY);style(ranges[1],knownRange==0?SELECTED:SECONDARY);
   String known=(knownLevel>=1&&knownLevel<=3?"Aktuell: Stufe "+knownLevel:knownLevel!=0?"Unbekannter Stufenwert: "+knownLevel:"Stufe noch nicht gelesen")+" · Reichweite "+(knownRange<0?"unbekannt":knownRange==1?"ein":"aus");
+  if(connected&&!writable())known+="\nNur Lesen: Die Register-Zuordnung ist für dieses Modell (z. B. F3) nicht bestätigt, daher sind Änderungen gesperrt.";
   settingsInfo.setText(!connected?"Mit dem Roller verbinden, um Werte zu lesen und zu ändern.":settingsNote.isEmpty()?known:settingsNote+"\n"+known);
   // Protokoll
   String all=ConnectService.logs(),visible=all;
@@ -248,16 +256,18 @@ public final class MainActivity extends Activity {
  private void permissions(){List<String> names=new ArrayList<>();if(Build.VERSION.SDK_INT>=31){names.add(Manifest.permission.BLUETOOTH_SCAN);names.add(Manifest.permission.BLUETOOTH_CONNECT);}else names.add(Manifest.permission.ACCESS_FINE_LOCATION);if(Build.VERSION.SDK_INT>=33)names.add(Manifest.permission.POST_NOTIFICATIONS);requestPermissions(names.toArray(new String[0]),1);}
  @Override public void onRequestPermissionsResult(int code,String[] names,int[] results){render();}
  private boolean allowed(){return Build.VERSION.SDK_INT>=31?checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED:checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;}
- private void search(){if(!allowed()){permissions();notice("Berechtigung erlauben und Suche erneut starten.");return;}stopScan();try{BluetoothAdapter a=((BluetoothManager)getSystemService(BLUETOOTH_SERVICE)).getAdapter();if(a==null||!a.isEnabled()){notice("Bluetooth einschalten.");return;}scanner=a.getBluetoothLeScanner();devices.removeAllViews();seen.clear();scanning=true;render();
+ private void search(){if(!allowed()){permissions();notice("Berechtigung erlauben und Suche erneut starten.");return;}stopScan();try{BluetoothAdapter a=((BluetoothManager)getSystemService(BLUETOOTH_SERVICE)).getAdapter();if(a==null||!a.isEnabled()){notice("Bluetooth einschalten.");return;}scanner=a.getBluetoothLeScanner();devices.removeAllViews();seen.clear();scanning=true;searched=true;render();
    // No filter: some G3 advertisements omit service UUIDs. Only recognizable Ninebot devices enter the list.
-   scanner.startScan(null,new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),scan);handler.postDelayed(()->{stopScan();render();if(seen.isEmpty())notice("Kein G3 gefunden. Roller einschalten; auf Android 8–11 auch Standort einschalten.");},10000);
+   scanner.startScan(null,new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),scan);handler.postDelayed(()->{stopScan();render();if(seen.isEmpty())notice(showAll?"Kein Gerät mit Namen gefunden. Roller einschalten; auf Android 8–11 auch Standort einschalten.":"Kein Roller gefunden. Roller einschalten; auf Android 8–11 auch Standort einschalten. Sonst „Alle Geräte zeigen“.");},10000);
   }catch(Exception e){scanning=false;notice(ConnectService.message(e));}}
- private void found(ScanResult r){if(!scanning||r.getScanRecord()==null)return;String name=r.getScanRecord().getDeviceName();if(name==null)name=r.getDevice().getName();if(name==null||!name.startsWith("1C"))return;String address=r.getDevice().getAddress();if(!seen.add(address))return;final String fullName=name;deviceRow(seen.size(),r.getRssi(),()->connect(address,fullName,false));}
- private void deviceRow(int number,int rssi,Runnable action){
+ private void found(ScanResult r){if(!scanning||r.getScanRecord()==null)return;String name=r.getScanRecord().getDeviceName();if(name==null)name=r.getDevice().getName();if(name==null||name.trim().isEmpty())return;List<android.os.ParcelUuid> services=r.getScanRecord().getServiceUuids();boolean ninebot=services!=null&&(services.contains(NORDIC)||services.contains(NINEBOT));
+  // G3 serials start with 1C; other Ninebot models with the same display (F3 Pro D / F3 D) are recognized by their BLE service.
+  if(!isG3(name)&&!ninebot&&!showAll)return;String address=r.getDevice().getAddress();if(!seen.add(address))return;final String fullName=name;deviceRow(seen.size(),fullName,ninebot,r.getRssi(),()->connect(address,fullName,false));}
+ private void deviceRow(int number,String name,boolean ninebot,int rssi,Runnable action){
   LinearLayout item=new LinearLayout(this);item.setGravity(Gravity.CENTER_VERTICAL);item.setPadding(dp(14),dp(12),dp(14),dp(12));item.setBackground(pressable(SURFACE2,14,BORDER,TEXT));item.setClickable(true);item.setOnClickListener(v->action.run());
-  TextView icon=text("G3",12,ACCENT_STRONG,Typeface.DEFAULT_BOLD);icon.setGravity(Gravity.CENTER);icon.setBackground(oval(ACCENT_SOFT));item.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
+  TextView icon=text(isG3(name)?"G3":ninebot?"NB":"?",12,ACCENT_STRONG,Typeface.DEFAULT_BOLD);icon.setGravity(Gravity.CENTER);icon.setBackground(oval(ACCENT_SOFT));item.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
   LinearLayout texts=vertical();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(12);item.addView(texts,lp);
-  texts.addView(text("Ninebot G3 · Gerät "+number,15,TEXT,medium()));texts.addView(text((rssi>=-65?"Signal stark":rssi>=-80?"Signal mittel":"Signal schwach")+" · "+rssi+" dBm",12.5f,MUTED,null));
+  texts.addView(text(isG3(name)?"Ninebot MAX G3 · Gerät "+number:ninebot?"Ninebot-Roller (z. B. F3) · "+name:name,15,TEXT,medium()));texts.addView(text((rssi>=-65?"Signal stark":rssi>=-80?"Signal mittel":"Signal schwach")+" · "+rssi+" dBm",12.5f,MUTED,null));
   item.addView(text("Verbinden",14,ACCENT_STRONG,medium()));add(devices,item,8);
  }
  private void last(boolean force){String a=getSharedPreferences("g3",MODE_PRIVATE).getString("device",null),n=getSharedPreferences("g3",MODE_PRIVATE).getString("name",null);if(a==null||n==null){notice("Zuerst Roller suchen und auswählen.");return;}connect(a,n,force);}

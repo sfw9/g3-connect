@@ -185,3 +185,12 @@ Das Repo ist direkt auf Vercel deploybar: Projekt importieren, keine Einstellung
 - `g3-connect.apk` wird mit dem richtigen Dateityp als Download ausgeliefert.
 
 Vercel liefert automatisch HTTPS, das Web Bluetooth voraussetzt.
+
+## Andere Modelle: F3 Pro D / F3 D
+
+Die F3-Modelle haben dasselbe Display wie der MAX G3 und nutzen laut Community-Berichten dasselbe Protokoll (Encryption2). Die App findet sie jetzt:
+
+- **Web:** Die Geräteauswahl zeigt Roller mit Ninebot-Bluetooth-Dienst. Erscheint der Roller nicht, unter „Verbindungseinstellungen“ „Alle Bluetooth-Geräte in der Auswahl zeigen“ aktivieren und den Roller anhand seiner Seriennummer wählen.
+- **Android:** Die Suche zeigt neben G3 (Seriennummer `1C…`) auch Roller mit Ninebot-Bluetooth-Dienst; „Alle Geräte zeigen“ listet jedes Gerät mit Namen. Die Android-App unterstützt nur den Nordic-UART-Dienst (wie beim G3). Bietet ein Roller nur den neueren Ninebot-Dienst, meldet sie das und verweist auf die Web-App.
+
+Navigation und Displaytest funktionieren wie beim G3. **Beschleunigung und Reichweitenanzeige sind bei allen Modellen außer dem G3 nur lesbar**, weil die Register-Zuordnung aus der G3-Konfiguration stammt und am F3 nicht bestätigt ist. Nicht am echten F3 getestet.
