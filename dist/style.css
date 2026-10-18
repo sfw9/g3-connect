@@ -394,6 +394,17 @@ summary .badge { font-weight: 600; }
 .steps p { color: var(--muted); font-size: 14px; }
 .summary { font-weight: 700; color: var(--accent-strong); font-size: 15px; }
 
+/* ── Testwerte ───────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-self: stretch; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.form-grid .field { justify-content: flex-end; }
+.form-grid .field > label { font-size: 13px; }
+.sweep { align-self: stretch; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: var(--accent-soft); }
+.sweep h3 { font-size: 15px; color: var(--accent-strong); }
+.sweep .form-grid input, .sweep .form-grid select { background: var(--surface); }
+.wide-actions { align-self: stretch; }
+@media (max-width: 380px) { .form-grid { grid-template-columns: minmax(0, 1fr); } }
+
 /* ── Android ────────────────────────────────── */
 .promo h2 { font-size: 24px; font-weight: 780; letter-spacing: -.02em; }
 .promo > p:not(.meta):not(.callout) { color: var(--muted); }

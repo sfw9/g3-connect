@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=18"></script>
+<script type="module" src="app.js?v=19"></script>
 </head>
 <body>
 <header class="topbar">
@@ -190,6 +190,58 @@
     <button type="button" id="nav-test" class="btn" disabled>Displaytest senden</button>
     <label class="check"><input id="nav-verified" type="checkbox" disabled> Test am Display sichtbar: Linkspfeil mit 100 m</label>
     <p class="note">Bei einem Timeout die Diagnose als JSON speichern. Es werden keine alternativen Startformate automatisch ausprobiert. <a href="navigation-analysis.md">Protokoll und Grenzen</a></p>
+   </div>
+  </details>
+ </article>
+
+ <article class="card" aria-labelledby="manual-title">
+  <details class="sub flush">
+   <summary><span id="manual-title">Testwerte senden</span> <span class="badge">experimentell</span></summary>
+   <div class="body stack">
+    <p class="hint">Beliebige Werte ans G3-Display schicken, auch ohne Route und ohne GPS. Start nur im Stillstand. Es werden ausschließlich Display-Pakete gesendet, keine Motor- oder Steuerungsregister.</p>
+    <div class="sweep">
+     <h3>Alle Richtungen testen</h3>
+     <p class="hint small">Zeigt jedes Symbol nacheinander. Als Straßenname steht Nummer und Bezeichnung, z. B. „3/11 RECHTS“, damit du am Display die Zuordnung siehst. Abbiegedistanz, Reststrecke und Restzeit kommen aus den Feldern unten.</p>
+     <div class="form-grid">
+      <div class="field"><label for="man-sweep-mode">Umfang</label><select id="man-sweep-mode"><option value="known">11 Richtungen</option><option value="codes">Codes 0–31</option></select></div>
+      <div class="field"><label for="man-sweep-seconds">Sekunden je Symbol</label><input id="man-sweep-seconds" inputmode="numeric" autocomplete="off"></div>
+     </div>
+     <button type="button" id="man-sweep" class="btn primary" disabled>Alle Richtungen testen</button>
+    </div>
+    <div class="form-grid">
+     <div class="field span-2"><label for="man-direction">Richtung</label><select id="man-direction">
+       <option value="9">Geradeaus · Symbol 9</option>
+       <option value="2">Links · Symbol 2</option>
+       <option value="3">Rechts · Symbol 3</option>
+       <option value="4">Leicht links · Symbol 4</option>
+       <option value="5">Leicht rechts · Symbol 5</option>
+       <option value="6">Scharf links · Symbol 6</option>
+       <option value="7">Scharf rechts · Symbol 7</option>
+       <option value="8">Wenden · Symbol 8</option>
+       <option value="11">Kreisverkehr rechts · Symbol 11</option>
+       <option value="12">Kreisverkehr links · Symbol 12</option>
+       <option value="15">Ziel erreicht · Symbol 15</option>
+       <option value="custom">Eigener Symbolcode …</option>
+      </select></div>
+     <div class="field span-2" id="man-icon-field" hidden><label for="man-icon">Symbolcode <span class="opt">0–65535</span></label><input id="man-icon" inputmode="numeric" autocomplete="off"></div>
+     <div class="field span-2"><label for="man-next-road">Nächste Straße <span class="opt">max. 39 Byte</span></label><input id="man-next-road" autocomplete="off" spellcheck="false"></div>
+     <div class="field span-2"><label for="man-current-road">Aktuelle Straße <span class="opt">optional</span></label><input id="man-current-road" autocomplete="off" spellcheck="false"></div>
+     <div class="field"><label for="man-step">Abbiegedistanz <span class="opt">m</span></label><input id="man-step" inputmode="numeric" autocomplete="off"></div>
+     <div class="field"><label for="man-remaining">Reststrecke <span class="opt">km</span></label><input id="man-remaining" inputmode="decimal" autocomplete="off"></div>
+     <div class="field"><label for="man-minutes">Restfahrzeit <span class="opt">min</span></label><input id="man-minutes" inputmode="decimal" autocomplete="off"></div>
+     <div class="field"><label for="man-total">Gesamtstrecke <span class="opt">km</span></label><input id="man-total" inputmode="decimal" autocomplete="off" placeholder="wie Reststrecke"></div>
+     <div class="field"><label for="man-duration">Sendedauer <span class="opt">s · 0 = bis Stopp</span></label><input id="man-duration" inputmode="numeric" autocomplete="off"></div>
+     <div class="field"><label for="man-approach">Annäherung <span class="opt">m pro Sekunde</span></label><input id="man-approach" inputmode="numeric" autocomplete="off"></div>
+    </div>
+    <label class="check"><input id="man-gps" type="checkbox"> GPS-Signal vorhanden melden</label>
+    <label class="check"><input id="man-countdown" type="checkbox"> Restfahrzeit herunterzählen</label>
+    <div class="actions wide-actions">
+     <button type="button" id="man-once" class="btn" disabled>Einmal senden</button>
+     <button type="button" id="man-repeat" class="btn primary" disabled>Dauersenden</button>
+     <button type="button" id="man-stop" class="btn danger" disabled>Stopp</button>
+    </div>
+    <p id="man-status" class="hint" role="status" aria-live="polite">Mit dem Roller verbinden, dann Werte senden.</p>
+    <p class="note">Während des Sendens kannst du Werte ändern und erneut auf „Dauersenden“ bzw. „Neue Werte senden“ tippen. „Annäherung“ verringert Abbiegedistanz und Reststrecke jede Sekunde, um eine Fahrt zu simulieren. Die Routen-Navigation ist währenddessen gesperrt.</p>
    </div>
   </details>
  </article>

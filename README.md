@@ -194,3 +194,13 @@ Die F3-Modelle haben dasselbe Display wie der MAX G3 und nutzen laut Community-B
 - **Android:** Die Suche zeigt neben G3 (Seriennummer `1C…`) auch Roller mit Ninebot-Bluetooth-Dienst; „Alle Geräte zeigen“ listet jedes Gerät mit Namen. Die Android-App unterstützt nur den Nordic-UART-Dienst (wie beim G3). Bietet ein Roller nur den neueren Ninebot-Dienst, meldet sie das und verweist auf die Web-App.
 
 Navigation und Displaytest funktionieren wie beim G3. **Beschleunigung und Reichweitenanzeige sind bei allen Modellen außer dem G3 nur lesbar**, weil die Register-Zuordnung aus der G3-Konfiguration stammt und am F3 nicht bestätigt ist. Nicht am echten F3 getestet.
+
+## Testwerte senden (Web)
+
+Im Tab „Navigation“ unter „Testwerte senden“ lassen sich beliebige Werte ans Display schicken – ohne Route, ohne GPS, nur im Stillstand. Gesendet werden ausschließlich Display-Pakete (TFT 0x23/0x71), keine Motor- oder Steuerungsregister.
+
+- **Felder:** Richtung (oder beliebiger Symbolcode 0–65535), nächste und aktuelle Straße, Abbiegedistanz, Reststrecke, Gesamtstrecke, Restfahrzeit, GPS-Signal.
+- **Senden:** „Einmal senden“ oder „Dauersenden“ (jede Sekunde), Sendedauer (0 = bis Stopp), Restfahrzeit herunterzählen, „Annäherung“ (Abbiegedistanz und Reststrecke sinken jede Sekunde um den Wert). Werte lassen sich während des Sendens ändern und erneut senden.
+- **Alle Richtungen testen:** zeigt alle 11 bekannten Richtungen oder alle Symbolcodes 0–31 nacheinander (Sekunden je Symbol einstellbar). Als Straßenname erscheint z. B. „3/11 RECHTS“, damit am Display die Zuordnung sichtbar ist; jeder Schritt steht auch im Logger.
+
+Die Routen-Navigation ist gesperrt, solange Testwerte gesendet werden.

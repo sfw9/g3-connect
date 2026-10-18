@@ -1,8 +1,9 @@
 import {Ninebot} from './ninebot.js?v=11';
 import {installNavigation} from './navigation-ui.js?v=12';
+import {installManualSender} from './manual.js?v=1';
 import {hex} from './crypto.js?v=10';
 const $=id=>document.getElementById(id);
-const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null;
+const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null,manual=null;
 function rememberKey(key) {
   const id=client.device.id;sessionKeys.set(id,key);$('pairing-key').value=key;$('pairing-key').dataset.device=id;
   $('save-key').hidden=false;$('new-key-hint').hidden=false;
@@ -45,7 +46,7 @@ function update() {
   $('apply').disabled=!connected||busy||![1,2,3].includes(current)||!writable()||!selected()||selected()===current;
   $('cancel-pairing').hidden=!busy||!client?.device;
   $('pairing-key').disabled=busy||connected;$('name-override').disabled=busy||connected;
-  navigation?.update();
+  navigation?.update();manual?.update();
 }
 function reset() {current=null;setRangeCurrent(null);$('current-level').textContent='—';$('read-status').textContent='Noch nicht ausgelesen.';$('device-name').textContent='Kein Gerät';$('device-caption').textContent='Nicht verbunden';document.querySelectorAll('[name=level]').forEach(r=>r.checked=false);}
 function setRangeCurrent(value) {
@@ -147,7 +148,9 @@ $('copy-log').addEventListener('click',async()=>{
 });
 $('clear-log').addEventListener('click',()=>{logs.length=0;$('log').value='';$('log-feedback').textContent='Log geleert.';$('log-count').textContent='0 Einträge';});
 window.addEventListener('pagehide',()=>client?.disconnect());
-navigation=installNavigation({getClient:()=>client,isBusy:()=>busy,setBusy:value=>{busy=value;update();},log});
+// While test values are being sent, route navigation stays locked so both never drive the display at once.
+navigation=installNavigation({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log});
+manual=installManualSender({getClient:()=>client,isBusy:()=>busy,setBusy:value=>{busy=value;update();},log,beforeStart:()=>navigation.stop('Navigation für Testwerte beendet.')});
 log('G3 Logger Beta 16 gestartet.');
 log(`Browser: ${navigator.userAgent}`);
 log(`HTTPS/localhost: ${window.isSecureContext}; Web Bluetooth: ${!!navigator.bluetooth}; WebCrypto: ${!!crypto.subtle}.`);
