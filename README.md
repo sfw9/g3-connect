@@ -213,4 +213,5 @@ Im Tab „Roller“ unter „Eigene Sounds“: beliebige Audiodatei wählen, Aus
 - Übertragung an die VCU: Ankündigung `0x76`, 128-Byte-Abschnitte `0x77` mit der vom Roller gemeldeten Gruppengröße und Pause, Abschluss `0x78` (Index 0, invertierte Bytesumme). Jeder Status ≠ 0 bricht ab; nur im Stillstand.
 - **Die Slot-Nummer für den G3 ist unbekannt** (die Segway-App holt sie von ihrem Server). Sie muss eingetragen werden; es gibt keinen Standardwert. „Trockenlauf“ zeigt alle Werte, ohne etwas zu senden.
 - Custom-Taste auf „Soundeffekt“ stellen (Register `0x4A` = 8, mit Rücklesen und Zurücksetzen) und testweise abspielen (`playSound`, Register `0x77`).
+- **Slot finden ohne Mitschnitt:** „Sound-Scanner“ spielt die Nummern nacheinander ab (nur `playSound`, nichts wird geschrieben). Vorher mit der Segway-App einen auffälligen eigenen Sound hochladen; bei diesem „Das war mein Sound“ tippen, die Nummer wird als Slot übernommen. Annahme (nicht bestätigt): Abspiel-Nummer = Upload-Slot.
 - Nur am MAX G3 freigegeben.

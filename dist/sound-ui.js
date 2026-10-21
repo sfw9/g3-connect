@@ -3,11 +3,32 @@ import {convertAudio,encodeWav,buildPayload,checksum,planChunks,uploadSound,VCU,
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
   let payload=null,previewUrl=null,uploading=null,previousKey=null,source=null;
+  // Sound scanner: plays playSound values one after another so the user can hear which number holds their sound.
+  let scanTimer=null,scanValue=null,lastPlayed=null;const hits=[];
+  const num=(id,max,fallback)=>{const t=String($(id).value).trim().replace(',','.');const n=Number(t);return t!==''&&Number.isFinite(n)&&n>=0&&n<=max?n:fallback;};
+  const range=()=>{const a=Math.floor(num('snd-scan-from',255,0)),b=Math.floor(num('snd-scan-to',255,255));return a<=b?[a,b]:[b,a];};
+  async function play(value){
+    const c=getClient();if(!c?.authenticated)throw new Error('Verbindung getrennt.');
+    setBusy(true);try{await c.writeNoReply(VCU,REG_PLAY_SOUND,value);}finally{setBusy(false);}
+    lastPlayed=value;$('snd-scan-current').textContent=String(value);log(`Sound-Scanner: playSound ${value}.`);
+  }
+  function stopScan(message){clearInterval(scanTimer);scanTimer=null;scanValue=null;if(message)say(message);update();}
+  async function scanStep(){
+    if(scanValue===null)return;const [,to]=range();
+    if(scanValue>to){stopScan(`Scan beendet. ${hits.length?`Markiert: ${hits.join(', ')}.`:'Kein Treffer markiert.'}`);return;}
+    if(isBusy())return;
+    try{await play(scanValue);say(`Scan: Nummer ${scanValue} gespielt. Bei deinem Sound „Das war mein Sound“ tippen.`);scanValue++;}
+    catch(e){stopScan(`Scan abgebrochen: ${e.message}`);}
+  }
+  async function stepTo(value){
+    const [from,to]=range();if(scanTimer)stopScan();const v=Math.min(to,Math.max(from,value));
+    try{await play(v);say(`Nummer ${v} gespielt.`);}catch(e){say(e.message);}update();
+  }
   const say=t=>{$('snd-status').textContent=t;};
   const online=()=>!!getClient()?.authenticated;
   const slot=()=>{const t=String($('snd-slot').value).trim();return /^\d{1,3}$/.test(t)&&Number(t)<=255?Number(t):null;};
   function update(){
-    const ready=online()&&writable()&&!isBusy();
+    const ready=online()&&writable()&&!isBusy()&&!scanTimer;
     $('snd-upload').disabled=!ready||!payload||slot()===null||!$('snd-confirm').checked;
     $('snd-dry').disabled=!payload||slot()===null;
     $('snd-cancel').hidden=!uploading;
@@ -15,6 +36,12 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     $('snd-play').disabled=!ready||slot()===null;
     $('snd-key-restore').disabled=!ready||previousKey===null;
     $('snd-lock').hidden=!online()||writable();
+    if(scanTimer&&!online())stopScan('Scan abgebrochen: Verbindung getrennt.');
+    const scanReady=online()&&writable();
+    $('snd-scan-start').disabled=!scanReady||(!scanTimer&&isBusy());
+    $('snd-scan-start').textContent=scanTimer?'Scan stoppen':'Scan starten';
+    $('snd-scan-prev').disabled=$('snd-scan-next').disabled=!scanReady||!!scanTimer||isBusy();
+    $('snd-scan-hit').disabled=lastPlayed===null;
   }
   async function convert(){
     if(!source){payload=null;update();return;}
@@ -72,6 +99,21 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     try{await getClient().writeNoReply(VCU,REG_PLAY_SOUND,target);log(`playSound: Wert ${target} gesendet (experimentell).`);say(`Abspielbefehl für ${target} gesendet. Ob der Wert die Slot-Nummer ist, ist nicht bestätigt.`);}
     catch(e){say(e.message);}
   }));
+  $('snd-scan-start').addEventListener('click',()=>{
+    if(scanTimer){stopScan('Scan gestoppt.');return;}
+    const [from]=range(),pause=Math.max(1,num('snd-scan-pause',60,3));
+    scanValue=from;log(`Sound-Scanner: ${range().join('–')}, alle ${pause} s.`);
+    scanTimer=setInterval(()=>void scanStep(),pause*1000);void scanStep();update();
+  });
+  $('snd-scan-next').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed+1));
+  $('snd-scan-prev').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed-1));
+  $('snd-scan-hit').addEventListener('click',()=>{
+    // While scanning, the last value played is the one just heard; the scan keeps running for further hits.
+    if(lastPlayed===null)return;if(!hits.includes(lastPlayed))hits.push(lastPlayed);
+    $('snd-scan-hits').textContent=`Markiert: ${hits.join(', ')}. Als Slot übernommen: ${lastPlayed}.`;
+    $('snd-slot').value=String(lastPlayed);log(`Sound-Scanner: Nummer ${lastPlayed} als eigener Sound markiert.`);update();
+  });
+  window.addEventListener('pagehide',()=>clearInterval(scanTimer));
   update();
   return {update};
 }
