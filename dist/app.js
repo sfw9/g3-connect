@@ -81,7 +81,11 @@ async function connect(forcePairing=false) {
     // requestDevice must be invoked directly from this click, before unrelated await.
     await client.choose($('show-all-devices').checked);log('Bluetooth-Gerät ausgewählt.');$('device-name').textContent=client.device.name||'Ninebot-Roller';
     const enteredKey=(!$('pairing-key').dataset.device || $('pairing-key').dataset.device===client.device.id)?key:'';
-    await client.connect(forcePairing?'':enteredKey||rememberedKey(client.device.id),$('name-override').value,{forcePairing});
+    const usedKey=forcePairing?'':enteredKey||rememberedKey(client.device.id);
+    await client.connect(usedKey,$('name-override').value,{forcePairing});
+    // Show the key in use, not only a freshly paired one, so it can be revealed or saved at any time.
+    if(usedKey&&!$('pairing-key').value){$('pairing-key').value=usedKey;$('pairing-key').dataset.device=client.device.id;}
+    if($('pairing-key').value)$('save-key').hidden=false;
     $('device-name').textContent=client.device.name||'Ninebot-Roller';
     if(!writable())log('Kein G3-Name (1C…): Navigation verfügbar, Einstellungen nur lesend.');
     status('Roller verbunden','Verschlüsselte Verbindung hergestellt. Beschleunigungsstufe wird gelesen.','success');

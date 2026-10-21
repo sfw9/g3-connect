@@ -30,7 +30,7 @@ public final class MainActivity extends Activity {
  private static final int OFFLINE=0,CONNECTING=1,PAIRING=2,CONNECTED=3,NAVIGATING=4,FAILED=5;
  private int BG,SURFACE,SURFACE2,BORDER,BORDER_STRONG,TEXT,MUTED,ACCENT,ACCENT_STRONG,ACCENT_SOFT,ON_ACCENT,DANGER,DANGER_SOFT,SUCCESS,SUCCESS_SOFT,WARN,WARN_SOFT,LOG_BG,LOG_TEXT;
  private boolean night;
- private TextView chip,statusTitle,statusDetail,primary,search,repair,scanLabel,setupSummary,navMain,navRoad,navMeta,manualState,manualStop,settingsInfo,logView,logToggle;
+ private TextView keyButton,chip,statusTitle,statusDetail,primary,search,repair,scanLabel,setupSummary,navMain,navRoad,navMeta,manualState,manualStop,settingsInfo,logView,logToggle;
  private LinearLayout statusBox,secondaryRow,devices,scanRow,maneuver,setupBody;private TurnIcon turn;private Switch automatic;
  private final TextView[] levels=new TextView[3],ranges=new TextView[2];private final List<View> needsConnection=new ArrayList<>();
  private Step bluetoothStep,listenerStep,batteryStep;private boolean logExpanded,wasConnected;private String shownLog="";private int primaryMode;
@@ -51,7 +51,7 @@ public final class MainActivity extends Activity {
   column.setOnApplyWindowInsetsListener((view,insets)->{view.setPadding(pad+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),pad+insets.getSystemWindowInsetRight(),dp(24)+insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
   ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setClipToPadding(false);scroll.addView(column);setContentView(scroll);
   header(column);scooterCard(column);setupCard(column);navigationCard(column);settingsCard(column);soundCard(column);logCard(column);infoCard(column);
-  ConnectService.log("G3 Connect Android 1.0 geöffnet · Android "+Build.VERSION.RELEASE);
+  ConnectService.log("G3 Connect Android 1.1 geöffnet · Android "+Build.VERSION.RELEASE);
  }
 
  // ── Farben und Systemleisten ─────────────────────────────
@@ -69,7 +69,7 @@ public final class MainActivity extends Activity {
   LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(8),0,dp(4));column.addView(row);
   TextView logo=text("G3",15,ON_ACCENT,Typeface.DEFAULT_BOLD);logo.setGravity(Gravity.CENTER);logo.setBackground(shape(ACCENT,12,0));row.addView(logo,new LinearLayout.LayoutParams(dp(42),dp(42)));
   LinearLayout titles=vertical();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(12);row.addView(titles,lp);
-  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot G3 · F3 · Android 1.0",12.5f,MUTED,null));
+  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot G3 · F3 · Android 1.1",12.5f,MUTED,null));
   chip=text("Offline",13,MUTED,medium());chip.setPadding(dp(12),dp(6),dp(12),dp(6));chip.setCompoundDrawablePadding(dp(8));row.addView(chip);
  }
 
@@ -86,6 +86,7 @@ public final class MainActivity extends Activity {
   devices=vertical();add(card,devices,4);
   showAllButton=button("Roller nicht dabei? Alle Geräte zeigen",SECONDARY,()->{showAll=true;search();});showAllButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,13.5f);showAllButton.setMinHeight(dp(40));add(card,showAllButton,8);
   hint(card,"Roller einschalten und die Segway-App schließen. Bei „Neu koppeln“ erst auf Aufforderung die Power-Taste kurz drücken.",12);
+  keyButton=button("Pairing-Schlüssel anzeigen",SECONDARY,this::showPairingKey);keyButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,13.5f);keyButton.setMinHeight(dp(40));add(card,keyButton,10);
  }
 
  // ── Einrichtung ──────────────────────────────────────────
@@ -300,6 +301,7 @@ public final class MainActivity extends Activity {
   enable(search,!scanning);
   scanRow.setVisibility(scanning?View.VISIBLE:View.GONE);devices.setVisibility(online?View.GONE:View.VISIBLE);
   showAllButton.setVisibility(!online&&!showAll&&(scanning||searched)?View.VISIBLE:View.GONE);
+  keyButton.setVisibility(storedKey()!=null?View.VISIBLE:View.GONE);
   // Einrichtung
   boolean bt=allowed(),listener=MapsState.listenerReady,battery=batteryUnrestricted();
   stepState(bluetoothStep,bt);stepState(listenerStep,listener);stepState(batteryStep,battery);
@@ -356,6 +358,24 @@ public final class MainActivity extends Activity {
  }
  private void fieldLabel(LinearLayout parent,String label){add(parent,text(label,13,MUTED,medium()),12);}
  private EditText manualField(LinearLayout parent,String label,String value,int type){fieldLabel(parent,label);EditText edit=new EditText(this);edit.setInputType(type);edit.setSingleLine(true);edit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(200)});edit.setText(value);edit.setContentDescription(label);edit.setBackgroundTintList(ColorStateList.valueOf(ACCENT));parent.addView(edit);return edit;}
+
+ // ── Pairing-Schlüssel ────────────────────────────────────
+ /** The key this app created at the Power-button pairing; never read from the scooter. Same format as the web app. */
+ private String storedKey(){SharedPreferences p=getSharedPreferences("g3",MODE_PRIVATE);String a=p.getString("device",null),k=a==null?null:p.getString("pair:"+a,null);if(k==null)return null;try{return NinebotCrypto.hex(android.util.Base64.decode(k,android.util.Base64.NO_WRAP));}catch(Exception e){return null;}}
+ private void showPairingKey(){
+  String key=storedKey();if(key==null){notice("Für den letzten Roller ist noch kein Schlüssel gespeichert.");return;}
+  LinearLayout box=vertical();int pad=dp(20);box.setPadding(pad,dp(8),pad,0);
+  box.addView(text("Roller: "+getSharedPreferences("g3",MODE_PRIVATE).getString("name","?"),13.5f,MUTED,null));
+  TextView value=text(key,17,TEXT,Typeface.MONOSPACE);value.setTextIsSelectable(true);value.setPadding(dp(12),dp(10),dp(12),dp(10));value.setBackground(shape(SURFACE2,12,BORDER));add(box,value,10);
+  TextView warn=text("Wer diesen Schlüssel hat, kann sich mit deinem Roller verbinden und Einstellungen ändern. Nicht öffentlich teilen. In der Web-App lässt er sich unter „Verbindungseinstellungen“ eintragen.",12.5f,WARN,null);add(box,warn,10);
+  AlertDialog d=new AlertDialog.Builder(this).setTitle("Pairing-Schlüssel").setView(box).setPositiveButton("Kopieren",(x,y)->{
+    ClipData clip=ClipData.newPlainText("Pairing-Schlüssel",key);
+    // Android 13+ hides sensitive clips in the clipboard preview.
+    if(Build.VERSION.SDK_INT>=33){PersistableBundle extras=new PersistableBundle();extras.putBoolean(ClipDescription.EXTRA_IS_SENSITIVE,true);clip.getDescription().setExtras(extras);}
+    ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(clip);Toast.makeText(this,"Schlüssel kopiert.",Toast.LENGTH_SHORT).show();
+   }).setNegativeButton("Schließen",null).show();
+  d.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ACCENT);d.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ACCENT);
+ }
 
  // ── Bluetooth (Verhalten unverändert) ────────────────────
  private void disconnect(){ConnectService s=ConnectService.instance;if(s!=null)s.disconnect();}

@@ -45,6 +45,8 @@ test('new-pair button bypasses an invalid input and saved key; normal connect st
   assert.equal(selections,2);assert.equal(nodes.get('connect').textContent,'Trennen');
   assert.equal(nodes.get('pair-again').disabled,true);assert.equal(nodes.get('current-level').textContent,'Stufe 2');
   assert.equal(nodes.get('log').value.includes(stored),false);
+  assert.equal(nodes.get('pairing-key').value,stored,'the saved key in use can be revealed after connecting');
+  assert.equal(nodes.get('save-key').hidden,false,'and saved');
  }finally{
   win.dispatchEvent(new Event('pagehide'));
   for(const [name,method]of original)Ninebot.prototype[name]=method;
