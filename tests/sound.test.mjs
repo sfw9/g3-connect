@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,CHUNK} from '../dist/sound.js';
+import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,setCustomSound,SOUND_SLOTS,slotInfo,CHUNK} from '../dist/sound.js';
 
 const silence=()=>buildPayload(encodeWav(new Float32Array(8000)));
 const hex=a=>[...a].map(b=>b.toString(16).padStart(2,'0')).join(' ');
@@ -23,12 +23,20 @@ test('begin reply: legacy, extended, 5000 ms compatibility case and default',()=
  assert.equal(parseBegin([0x40,0,20,0]).wait,20);
  assert.deepEqual(parseBegin([1,32,0,69,0,0,0,5,0,0,0]),{format:'extended',protocol:1,group:32,last:69,wait:5});
  assert.deepEqual(parseBegin([]),{format:'default',protocol:0,group:8,last:-1,wait:0});
+ assert.deepEqual(parseBegin([0x01,0x20,0x00,0xff,0xff,0xff,0xff,0x1e,0,0,0]),{format:'extended',protocol:1,group:32,last:-1,wait:30},'reply seen in the capture');
 });
 
-function scooter({begin=[0x40,0,0,0],beginStatus=0,ackStatus=()=>0,finishStatus=0,speed=0,dropAcks=0}={}){
- const log=[];let drops=dropAcks;
- return {log,
-  async read(board,index){log.push(['read',board,index]);return index===0x57?speed:0;},
+test('slot table from the Segway server: custom button 71, alarm 72, power on 73',()=>{
+ assert.deepEqual(SOUND_SLOTS.map(s=>[s.type,s.slot,s.mask,s.factory]),[['customize_sound',71,0x1000,8],['abnormal_alarm_sound',72,0x2000,14],['power_on_sound',73,0x4000,31]]);
+ assert.deepEqual(SOUND_SLOTS.filter(s=>s.confirmed).map(s=>s.slot),[71],'only slot 71 is confirmed by the capture');
+ assert.equal(slotInfo(8),null,'the custom key value 8 is not an upload slot');
+});
+
+function scooter({begin=[0x40,0,0,0],beginStatus=0,ackStatus=()=>0,finishStatus=0,speed=0,dropAcks=0,bits=0}={}){
+ const log=[],regs=new Map([[0x57,speed],[0x1f,bits]]);let drops=dropAcks;
+ return {log,regs,
+  async read(board,index){log.push(['read',board,index]);return regs.get(index)??0;},
+  async writeNoReply(board,index,value){log.push(['write',board,index,value]);regs.set(index,value);},
   async sendUnacknowledged(board,cmd,index,data){log.push(['tx',cmd,index,data.length]);},
   async request(board,cmd,index,data,expect,match){
    log.push(['req',cmd,index,cmd===0x77?data.length:hex(data)]);assert.equal(board,0x16);assert.equal(expect,cmd);assert.equal(match,null,'any status is accepted and evaluated');
@@ -50,6 +58,37 @@ test('upload sends begin, 126 chunks in groups of 64 and the checksum with index
  assert.equal(data.at(-1)[3],56,'last chunk is not padded');assert.ok(data.slice(0,-1).every(e=>e[3]===CHUNK));
  assert.deepEqual(s.log.at(-1),['req',0x78,0,'51 f6 ff ff']);
  assert.equal(progress.at(-1),126);assert.equal(r.checksum,0xfffff651);
+});
+
+test('upload of the captured 26 768-byte clip: 210 packets in groups of 32 with the reply from the capture',async()=>{
+ const s=scooter({begin:[0x01,0x20,0x00,0xff,0xff,0xff,0xff,0x1e,0,0,0]}),payload=new Uint8Array(26768);
+ const r=await uploadSound(s,{slot:71,payload,timeouts:quick});
+ assert.deepEqual(s.log.find(e=>e[1]===0x76),['req',0x76,71,'90 68 00 00 01']);
+ const data=s.log.filter(e=>e[1]===0x77);assert.equal(data.length,210);assert.equal(data.at(-1)[3],16);
+ const acks=[];data.forEach((e,i)=>{if(e[0]==='req')acks.push(i);});
+ assert.deepEqual(acks,[31,63,95,127,159,191,209],'group acknowledgements at the same packets as in the capture');
+ assert.equal(r.flow.wait,30);assert.ok(!s.log.some(e=>e[0]==='write'),'without mask register 0x1F is not touched');
+});
+
+test('with the event mask 0x1F is cleared during the upload and set afterwards, other bits kept',async()=>{
+ const s=scooter({bits:0x1001});
+ await uploadSound(s,{slot:71,mask:0x1000,payload:silence(),timeouts:quick});
+ const writes=s.log.filter(e=>e[0]==='write');assert.deepEqual(writes,[['write',0x16,0x1f,0x0001],['write',0x16,0x1f,0x1001]]);
+ const order=s.log.map(e=>e[0]==='write'?'w':e[1]===0x76?'begin':e[1]===0x78?'finish':null).filter(Boolean);
+ assert.deepEqual(order,['w','begin','finish','w']);
+ const fresh=scooter({bits:0x0004});await uploadSound(fresh,{slot:73,mask:0x4000,payload:silence(),timeouts:quick});
+ assert.deepEqual(fresh.log.filter(e=>e[0]==='write'),[['write',0x16,0x1f,0x4004]],'an inactive bit is only set after the upload');
+ const failed=scooter({bits:0x1000,finishStatus:3});
+ await assert.rejects(uploadSound(failed,{slot:71,mask:0x1000,payload:silence(),timeouts:quick}),/Speichern fehlgeschlagen/);
+ assert.equal(failed.regs.get(0x1f),0x1000,'previous value restored after a failure');
+ const lying={...scooter({bits:0x1000}),async read(b,i){return i===0x1f?0x1000:0;}};
+ await assert.rejects(uploadSound(lying,{slot:71,mask:0x1000,payload:silence(),timeouts:quick}),/Rücklesen/);
+});
+
+test('switch between custom sound and factory tone per event',async()=>{
+ const s=scooter({bits:0x3000});
+ assert.equal(await setCustomSound(s,0x2000,false),0x1000);assert.equal(await setCustomSound(s,0x4000,true),0x5000);
+ assert.equal(await setCustomSound(s,0x4000,true),0x5000);assert.equal(s.log.filter(e=>e[0]==='write').length,2,'no write when already set');
 });
 
 test('extended reply with protocol 1 resumes after the last stored packet',async()=>{

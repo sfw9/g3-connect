@@ -1,47 +1,35 @@
-import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=2';
+import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,setCustomSound,slotInfo,SOUND_SLOTS,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,REG_FUN_BOOL3,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=3';
 
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
   let payload=null,previewUrl=null,uploading=null,previousKey=null,source=null;
-  // Sound scanner: plays playSound values one after another so the user can hear which number holds their sound.
-  let scanTimer=null,scanValue=null,lastPlayed=null;const hits=[];
-  const num=(id,max,fallback)=>{const t=String($(id).value).trim().replace(',','.');const n=Number(t);return t!==''&&Number.isFinite(n)&&n>=0&&n<=max?n:fallback;};
-  const range=()=>{const a=Math.floor(num('snd-scan-from',255,0)),b=Math.floor(num('snd-scan-to',255,255));return a<=b?[a,b]:[b,a];};
-  async function play(value){
-    const c=getClient();if(!c?.authenticated)throw new Error('Verbindung getrennt.');
-    setBusy(true);try{await c.writeNoReply(VCU,REG_PLAY_SOUND,value);}finally{setBusy(false);}
-    lastPlayed=value;$('snd-scan-current').textContent=String(value);log(`Sound-Scanner: playSound ${value}.`);
-  }
-  function stopScan(message){clearInterval(scanTimer);scanTimer=null;scanValue=null;if(message)say(message);update();}
-  async function scanStep(){
-    if(scanValue===null)return;const [,to]=range();
-    if(scanValue>to){stopScan(`Scan beendet. ${hits.length?`Markiert: ${hits.join(', ')}.`:'Kein Treffer markiert.'}`);return;}
-    if(isBusy())return;
-    try{await play(scanValue);say(`Scan: Nummer ${scanValue} gespielt. Bei deinem Sound „Das war mein Sound“ tippen.`);scanValue++;}
-    catch(e){stopScan(`Scan abgebrochen: ${e.message}`);}
-  }
-  async function stepTo(value){
-    const [from,to]=range();if(scanTimer)stopScan();const v=Math.min(to,Math.max(from,value));
-    try{await play(v);say(`Nummer ${v} gespielt.`);}catch(e){say(e.message);}update();
-  }
   const say=t=>{$('snd-status').textContent=t;};
   const online=()=>!!getClient()?.authenticated;
-  const slot=()=>{const t=String($('snd-slot').value).trim();return /^\d{1,3}$/.test(t)&&Number(t)<=255?Number(t):null;};
+  const manual=()=>$('snd-event').value==='other';
+  const slot=()=>{
+    const t=manual()?String($('snd-slot').value).trim():$('snd-event').value;
+    return /^\d{1,3}$/.test(t)&&Number(t)<=255?Number(t):null;
+  };
+  // Known event slots are uploaded with their 0x1F bit; a manual number is sent without touching the register.
+  const event=()=>manual()?null:slotInfo(slot());
+  const needsConfirm=()=>!event()?.confirmed;
+  function describe(){
+    const e=event(),n=slot();
+    $('snd-slot-field').hidden=!manual();$('snd-confirm-row').hidden=!needsConfirm();
+    $('snd-slot-info').textContent=e?`${e.label}: Slot ${e.slot} (0x${e.slot.toString(16)}), Bit 0x${e.mask.toString(16)} in Register 0x1F. ${e.confirmed?'Upload am Roller bestätigt.':'Vom Segway-Server gemeldet, Upload am Roller noch nicht beobachtet.'}`
+      :n!==null&&slotInfo(n)?`Slot ${n} ist ${slotInfo(n).label}; besser oben direkt auswählen, dann wird auch Register 0x1F gesetzt.`
+      :'Unbekannter Slot: kann abgelehnt werden oder einen vorhandenen Sound überschreiben. Register 0x1F wird nicht verändert.';
+  }
   function update(){
-    const ready=online()&&writable()&&!isBusy()&&!scanTimer;
-    $('snd-upload').disabled=!ready||!payload||slot()===null||!$('snd-confirm').checked;
+    const ready=online()&&writable()&&!isBusy();
+    $('snd-upload').disabled=!ready||!payload||slot()===null||(needsConfirm()&&!$('snd-confirm').checked);
     $('snd-dry').disabled=!payload||slot()===null;
     $('snd-cancel').hidden=!uploading;
-    for(const id of ['snd-key-read','snd-key-set','snd-play'])$(id).disabled=!ready;
+    for(const id of ['snd-key-read','snd-key-set','snd-mode-read'])$(id).disabled=!ready;
+    $('snd-mode-on').disabled=$('snd-mode-off').disabled=!ready||!event();
     $('snd-play').disabled=!ready||slot()===null;
     $('snd-key-restore').disabled=!ready||previousKey===null;
     $('snd-lock').hidden=!online()||writable();
-    if(scanTimer&&!online())stopScan('Scan abgebrochen: Verbindung getrennt.');
-    const scanReady=online()&&writable();
-    $('snd-scan-start').disabled=!scanReady||(!scanTimer&&isBusy());
-    $('snd-scan-start').textContent=scanTimer?'Scan stoppen':'Scan starten';
-    $('snd-scan-prev').disabled=$('snd-scan-next').disabled=!scanReady||!!scanTimer||isBusy();
-    $('snd-scan-hit').disabled=lastPlayed===null;
   }
   function useSamples(samples,label){
     const wav=encodeWav(samples);payload=buildPayload(wav);
@@ -56,31 +44,42 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
       const seconds=Math.min(MAX_SECONDS,Math.max(0.2,Number(String($('snd-seconds').value).replace(',','.'))||MAX_SECONDS));
       const {samples,seconds:len,sourceSeconds}=await convertAudio(source,{start,seconds,normalize:$('snd-normalize').checked});
       useSamples(samples,`${len.toFixed(2).replace('.',',')} s von ${sourceSeconds.toFixed(1).replace('.',',')} s`);
-      say('Bereit. Vorschau anhören, Slot eintragen und hochladen.');
+      say('Bereit. Vorschau anhören, Ereignis wählen und hochladen.');
     }catch(e){payload=null;$('snd-preview').hidden=true;say(e.message);}
     update();
   }
   async function exclusive(fn){if(isBusy())return;setBusy(true);try{return await fn();}finally{setBusy(false);update();}}
-  $('snd-tone').addEventListener('click',()=>{source=null;$('snd-file').value='';useSamples(testTone(),'Testton: drei aufsteigende Pieptöne, 1,5 s');say('Testton bereit. Für die Slot-Suche eine stille Nummer eintragen, hochladen und mit „Abspielen“ prüfen.');update();});
+  $('snd-tone').addEventListener('click',()=>{source=null;$('snd-file').value='';useSamples(testTone(),'Testton: drei aufsteigende Pieptöne, 1,5 s');say('Testton bereit. Ereignis wählen und hochladen.');update();});
   $('snd-file').addEventListener('change',async()=>{const f=$('snd-file').files?.[0];source=f?await f.arrayBuffer():null;await convert();});
   for(const id of ['snd-start','snd-seconds','snd-normalize'])$(id).addEventListener('change',()=>void convert());
-  for(const id of ['snd-slot','snd-confirm'])$(id).addEventListener('input',update),$(id).addEventListener('change',update);
+  for(const id of ['snd-event','snd-slot','snd-confirm'])for(const type of ['input','change'])$(id).addEventListener(type,()=>{if(id!=='snd-confirm')$('snd-confirm').checked=false;describe();update();});
   $('snd-dry').addEventListener('click',()=>{
-    if(!payload)return;const sum=checksum(payload),{count,lastLength}=planChunks(payload.length);
-    const text=`Trockenlauf Slot ${slot()}: Ankündigung 0x76 mit ${payload.length} Bytes, ${count} Pakete à 128 Bytes (letztes ${lastLength}), Prüfsumme 0x${sum.toString(16).padStart(8,'0')} mit 0x78. Nichts gesendet.`;
+    if(!payload)return;const sum=checksum(payload),{count,lastLength}=planChunks(payload.length),e=event();
+    const text=`Trockenlauf Slot ${slot()}${e?` (${e.label})`:''}: ${e?`Register 0x1F Bit 0x${e.mask.toString(16)} löschen, `:''}Ankündigung 0x76 mit ${payload.length} Bytes, ${count} Pakete à 128 Bytes (letztes ${lastLength}), Prüfsumme 0x${sum.toString(16).padStart(8,'0')} mit 0x78${e?', danach Bit setzen':''}. Nichts gesendet.`;
     say(text);log(text);
   });
   $('snd-upload').addEventListener('click',()=>exclusive(async()=>{
-    const c=getClient(),target=slot();if(!payload||target===null||!c?.authenticated||!writable())return;
+    const c=getClient(),target=slot(),e=event();if(!payload||target===null||!c?.authenticated||!writable())return;
     uploading=new AbortController();update();$('snd-progress').hidden=false;$('snd-progress').value=0;
+    const name=e?`${e.label} (Slot ${target})`:`Slot ${target}`;
     try{
-      say(`Upload in Slot ${target} läuft …`);
-      const r=await uploadSound(c,{slot:target,payload,signal:uploading.signal,log,onProgress:(n,total)=>{$('snd-progress').value=n/total;say(`Upload in Slot ${target}: ${n}/${total} Pakete …`);}});
-      say(`Upload abgeschlossen: ${r.packets} Pakete, Prüfsumme vom Roller bestätigt. Mit „Abspielen“ oder der Custom-Taste testen.`);
-    }catch(e){say(`Upload fehlgeschlagen: ${e.message}`);log(`Sound-Upload: ${e.message}`,'ERROR');}
+      say(`Upload ${name} läuft …`);
+      const r=await uploadSound(c,{slot:target,payload,mask:e?.mask||0,signal:uploading.signal,log,onProgress:(n,total)=>{$('snd-progress').value=n/total;say(`Upload ${name}: ${n}/${total} Pakete …`);}});
+      const test=e?.type==='customize_sound'?' Custom-Taste auf „Soundeffekt“ stellen und drücken.':e?.type==='power_on_sound'?' Zum Testen den Roller aus- und einschalten.':'';
+      say(`Upload abgeschlossen: ${r.packets} Pakete, Prüfsumme vom Roller bestätigt${e?', eigener Sound aktiv':''}.${test}`);
+    }catch(err){say(`Upload fehlgeschlagen: ${err.message}`);log(`Sound-Upload: ${err.message}`,'ERROR');}
     finally{uploading=null;$('snd-progress').hidden=true;}
   }));
   $('snd-cancel').addEventListener('click',()=>uploading?.abort());
+  function showMode(value){
+    $('snd-mode-state').textContent=`Register 0x1F = 0x${value.toString(16).padStart(4,'0')}: `+SOUND_SLOTS.map(s=>`${s.label} ${value&s.mask?'eigener Sound':'Werkston'}`).join(' · ');
+  }
+  $('snd-mode-read').addEventListener('click',()=>exclusive(async()=>{try{showMode(await getClient().read(VCU,REG_FUN_BOOL3));}catch(e){say(e.message);}}));
+  for(const [id,on] of [['snd-mode-on',true],['snd-mode-off',false]])$(id).addEventListener('click',()=>exclusive(async()=>{
+    const e=event();if(!e)return;
+    try{const v=await setCustomSound(getClient(),e.mask,on);showMode(v);log(`${e.label}: ${on?'eigener Sound':'Werkston'} (Register 0x1F = 0x${v.toString(16)}, Rücklesen bestätigt).`);say(`${e.label} spielt jetzt ${on?'den eigenen Sound':'den Werkston'}.`);}
+    catch(err){say(`${e.label} nicht umgestellt: ${err.message}`);log(`Register 0x1F: ${err.message}`,'ERROR');}
+  }));
   async function readKey(c){const v=await c.read(VCU,REG_CUSTOM_KEY);$('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${v}${v===CUSTOM_KEY_SOUND?' (Soundeffekt)':''}`;return v;}
   $('snd-key-read').addEventListener('click',()=>exclusive(async()=>{try{await readKey(getClient());}catch(e){say(e.message);}}));
   $('snd-key-set').addEventListener('click',()=>exclusive(async()=>{
@@ -102,22 +101,6 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     try{await getClient().writeNoReply(VCU,REG_PLAY_SOUND,target);log(`playSound: Wert ${target} gesendet (experimentell).`);say(`Abspielbefehl für ${target} gesendet. Ob der Wert die Slot-Nummer ist, ist nicht bestätigt.`);}
     catch(e){say(e.message);}
   }));
-  $('snd-scan-start').addEventListener('click',()=>{
-    if(scanTimer){stopScan('Scan gestoppt.');return;}
-    const [from]=range(),pause=Math.max(1,num('snd-scan-pause',60,3));
-    scanValue=from;log(`Sound-Scanner: ${range().join('–')}, alle ${pause} s.`);
-    scanTimer=setInterval(()=>void scanStep(),pause*1000);void scanStep();update();
-  });
-  $('snd-scan-next').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed+1));
-  $('snd-scan-prev').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed-1));
-  $('snd-scan-hit').addEventListener('click',()=>{
-    // While scanning, the last value played is the one just heard; the scan keeps running for further hits.
-    if(lastPlayed===null)return;if(!hits.includes(lastPlayed))hits.push(lastPlayed);
-    hits.sort((a,b)=>a-b);
-    $('snd-scan-hits').textContent=`Belegt (Ton gehört): ${hits.join(', ')}. Diese Nummern nicht überschreiben. Zum Prüfen eines eigenen Sounds die Nummer ins Slot-Feld übernehmen.`;
-    log(`Sound-Scanner: Ton bei Nummer ${lastPlayed} gehört.`);update();
-  });
-  window.addEventListener('pagehide',()=>clearInterval(scanTimer));
-  update();
+  describe();update();
   return {update};
 }

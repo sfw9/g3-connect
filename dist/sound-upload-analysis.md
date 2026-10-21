@@ -1,14 +1,16 @@
 # Ninebot MAX G3: Upload eigener Sounds
 
-Stand: 21.10.2026, vertiefte Analyse (Revision 2). Statische Untersuchung der vorhandenen Ninebot-/Segway-App und des G3-Gerätepakets. Kein Sound wurde an einen Roller gesendet. Die aktuell auf einem Telefon gewählte Transportvariante und die tatsächliche Annahme durch eine konkrete G3-Firmware sind damit nicht hardwarebestätigt.
+Stand: 21.10.2026, vertiefte Analyse (Revision 5). Statische Untersuchung der vorhandenen Ninebot-/Segway-App und des G3-Gerätepakets, ergänzt um anonyme Serveranfragen an den Sound-Leseendpunkt und die Auswertung des neu vom Nutzer bereitgestellten HCI-Mitschnitts. Kein Sound wurde an einen Roller gesendet. Die aktuell auf einem Telefon gewählte Transportvariante und die tatsächliche Annahme durch eine konkrete G3-Firmware sind damit nicht hardwarebestätigt.
 
 ## Ergebnis
+
+**Neuester Stand:** Der authentifizierte Sound-Leseaufruf ist erfolgreich. Für den abgefragten Roller liefert der Server **Taste → Slot 71 (`0x47`, Maske `0x1000`), Alarm → Slot 72 (`0x48`, `0x2000`), Einschalten → Slot 73 (`0x49`, `0x4000`)**. Das frühere Hindernis einer fehlenden Serverantwort ist für diese Zuordnung gelöst; siehe Abschnitt 10 und `server-success.md`.
 
 Die App enthält einen direkten Dateiübertragungsweg für benutzerdefinierte Sounds. Für den G3 nennt das Gerätepaket VCU als Ziel und die Befehle `0x76`, `0x77`, `0x78`. Der native WAV-Pfad verwendet 8 kHz, 16 Bit, Mono und einen zusätzlichen proprietären 12-Byte-Vorspann vor der WAV-Datei. Die Tastenfunktion ist davon getrennt: `setCustomKey = 8` aktiviert die Soundfunktion der benutzerdefinierten Taste, überträgt aber keine Audiodaten.
 
 Die Java-BLE-Dateiübertragung ist bis zur Kommandoerzeugung nachvollzogen. Der Abschlussindex dieses Pfads ist **0**, die Konfigurationsvorgabe 1 wird dabei nicht verwendet. Die aktuelle App aktiviert standardmäßig das neuere Rust-SDK; dessen Aufrufparameter sind ebenfalls rekonstruiert, sein geschützter nativer Nachrichtenaufbau jedoch nicht vollständig.
 
-Der verbleibende zentrale Datenmangel ist die **numerische G3-Zuordnung Ereignis → Upload-Slot**: Die UI übernimmt diese aus einer Serverantwort, die in den vorhandenen Dateien nicht enthalten ist. Die untersuchten zusätzlichen Sound-/Tastenmodule enthalten auch keine eigenständige G3-Slottabelle. Ein universell funktionierender Uploader ist damit noch nicht belegt. Ein Mitschnitt wird für diese Analyse nicht vorausgesetzt oder vom Nutzer angefordert.
+**Aktualisierung durch den neuen Mitschnitt:** Drei erfolgreiche Uploads auf VCU-Slot **71 (`0x47`)** sind jetzt protokollbestätigt. Die Ereignisbezeichnung dieses Slots und eine vollständige Slottabelle bleiben offen. Die folgende Darstellung beschreibt den früheren Offline-Stand: Die UI übernimmt diese aus einer Serverantwort, die in den vorhandenen Dateien nicht enthalten ist. Die untersuchten zusätzlichen Sound-/Tastenmodule enthalten auch keine eigenständige G3-Slottabelle. Ein universell funktionierender Uploader ist damit noch nicht belegt. Ein Mitschnitt wird für diese Analyse nicht vorausgesetzt oder vom Nutzer angefordert.
 
 ## Untersuchte Quellen
 
@@ -228,3 +230,56 @@ Geprüft wurden RIFF-Längenfelder, vollständige Rekonstruktion des Payloads au
 4. Annahme, korrekte Wiedergabe und dauerhafte Speicherung auf der konkreten G3-Firmware. Es wurde keine Hardwarekommunikation ausgeführt.
 
 Diese vertiefte Analyse ist mit dem verfügbaren Material abgeschlossen. Weitere Sicherheit erfordert zusätzliche Primärdaten, etwa eine passende Serverantwort oder Firmware-Dokumentation; vom Nutzer wird hier kein Mitschnitt verlangt. Die Untersuchung hat weder die veröffentlichte App noch das auf Google Maps beschränkte GitHub-Paket verändert.
+
+
+## 8. Direkter Serverversuch am 21.10.2026
+
+Auf Wunsch des Nutzers wurden echte anonyme **POST**-Anfragen mit leerem JSON-Objekt an `/vehicle/sound/setting-info` gesendet. Es wurden keine Kontodaten, Tokens oder Fahrzeugkennungen verwendet und keine Schreibendpunkte aufgerufen.
+
+Die richtige europäische Regionskennung ist `fra`, nicht `eu`: `NbServerRegion.FRA.getName()` liefert den kleingeschriebenen Enum-Namen, während `getLocale()` `eu` liefert. `getFormalUrl()` und das Produktionsmuster in `Server.json` verwenden den Regionsnamen. Es gibt an diesem Host keinen zusätzlich aus dem Basisschlüssel `v6` abzuleitenden `/v6/`-Pfadpräfix.
+
+| Versuch | Beobachtetes Ergebnis |
+| --- | --- |
+| `https://api-jhcx-v6-fra.ninebot.com/vehicle/sound/setting-info`, `Ninebot-Version: 1` | HTTP 200, JSON-Code 340000, `data: null`, `Undefined property: stdClass::$k` |
+| Derselbe Frankfurt-Endpunkt, `Ninebot-Version: 2` | Dieselbe JSON-Fehlermeldung bei HTTP 200 |
+| `https://api-jhcx-v6-bj.ninebot.com/vehicle/sound/setting-info`, Version 1 | Dieselbe JSON-Fehlermeldung bei HTTP 200 |
+| Beijing-Endpunkt, Version 2 | HTTP 403 mit `No approved upstream IPv4 address`; ein Proxy-/Upstream-Fehler dieser Umgebung, keine belegte Segway-Authentifizierungsantwort |
+| Anfänglich falsch abgeleiteter `api-jhcx-v6-eu.ninebot.com` | CONNECT 403 am Proxy; keine Antwort des Segway-Endpunkts belegt |
+
+Damit sind Frankfurt und Beijing erreichbar. **Die Sound-Einstellungen und Slotnummern wurden nicht geliefert.** HTTP 200 allein bedeutet hier keinen erfolgreichen API-Aufruf. Der Anwendungsfehler verweist auf ein fehlendes Feld `k`; er beweist weder, dass der Leseendpunkt anonym nutzbar ist, noch dass eine Anmeldung abgelehnt wurde.
+
+Die anschließende native Codeanalyse erklärt den Unterschied zur App-Anfrage: `CommonModule.encodeRequest` ergänzt gemeinsame Parameter, UID, App-/Plattformversion, Sprache, Gerätekennung und Region. Danach ruft es `YiDunSecurityPolicy.encrypt` auf. Dessen Standardpfad verwendet `YiDunRequestEncrypt` → `NeteaseDecrypt.encryptContent` → `SecruityInfo.encryptStringToServer` → `GenInfoImpl.getEncryptJson`. Dabei kommen `serviceTime`, eine zufällige `nonce` und ein MD5-`checkcode` hinzu; der Inhalt wird vor der Übergabe an den nativen SDK-Code Base64-kodiert. Die App referenziert dafür die native Bibliothek `netseckit-4.3.1`. Eine Remote-Konfiguration kann einen neueren YiDun-Pfad aktivieren; dessen Standard ist in der untersuchten Klasse nicht ausgewählt.
+
+**Diese native Anfragehülle ist bisher nicht nachgebildet.** Die gesendeten leeren JSON-Objekte sind daher Erreichbarkeits-/Formatversuche und keine vollständig appkompatiblen Anfragen. Beliebige Werte für `k`, fremde Identitäten oder erratene Tokens wurden nicht eingesetzt. Ob der korrekt verpackte Aufruf anschließend ein Konto oder eine Fahrzeugbindung verlangt, bleibt ungeprüft.
+
+`server-check.json` dokumentiert alle fünf Versuche mit UTC-Zeitpunkt, URL, verwendetem Versionsheader, Status und Antwort. Es wurden keine Bluetooth-Kommandos ausgeführt. Die G3-Ereignis-Slottabelle bleibt unbekannt.
+
+
+## 9. Neue Primärdaten: vollständig entschlüsselter HCI-Mitschnitt
+
+Der Nutzer hat nach den vorherigen Offline-/Serverversuchen eine vollständige Aufzeichnung geliefert. Alle **1.932** extrahierten Ninebot-Frames wurden unabhängig entschlüsselt und verifiziert (1.924 MACs, acht Initialprüfsummen). Zwei Kopplungen mit Power-Bestätigung und erfolgreichem AUTH sind enthalten, darunter eine 32-Byte-SET_PWD-Variante mit den ersten 16 Bytes als nachfolgend MAC-bestätigtem Schlüssel. Durch spätere Schlüsselgewinnung können auch die beiden früheren Sitzungen vollständig gelesen werden.
+
+Drei Uploads gehen an VCU `0x16`, Slot **`0x47` (71)**. Zweimal werden identische 63.176 Byte übertragen, einmal 26.768 Byte. Alle Dateien bestätigen den 12-Byte-Vorspann und PCM-WAV mit 8 kHz, 16 Bit, Mono. Die Geräteantwort fordert **32 Pakete pro Gruppe, 30 ms**; die Datenabschnitte haben maximal 128 Byte. Der Abschluss `0x78` verwendet Index 0 und die zuvor rekonstruierte Summen-Komplement-Prüfsumme. Alle Gruppen und drei Abschlüsse werden erfolgreich bestätigt.
+
+In der letzten Sitzung ändert die App außerdem VCU-Register `0x1F` vor dem Upload von `0x1000` auf `0x0000` und danach zurück auf `0x1000`, jeweils durch Rücklesen bestätigt. Die exakte Funktionsbezeichnung dieses Bits wird dadurch nicht bewiesen.
+
+**Dadurch geklärt:** eine tatsächlich akzeptierte Slotnummer und das im Mitschnitt verwendete Wire-Format. **Weiter offen:** Ereignisbezeichnung des Slots, übrige Slots, allgemeine Firmwarelimits und Persistenz/Wiedergabe nach Neustart. Die früheren Abschnitte 7 und 8 dokumentieren den damaligen Datenstand; ihre Aussage „kein Mitschnitt/Slot vorliegend“ ist durch diese neue Primärquelle für Slot 71 überholt.
+
+Der vollständige separate Bericht `capture-analysis.md` und die maschinenlesbare Zusammenfassung `capture-summary.json` sind diesem Forschungspaket beigefügt. Das separate `g3-capture-analysis.zip` enthält auch die entschlüsselten, um Kopplungsdaten bereinigten Frames, den Offline-Decoder und die rekonstruierten Audiodateien. Kein Live-Schreibzugriff und keine App-/Repositoryänderung wurden ausgeführt.
+
+
+## 10. Authentifizierte Serverantwort erhalten
+
+Die native Anfrageverschlüsselung wurde über das Original-SDK in ARM64-Emulation ausgeführt, und die Serverantwort wurde einschließlich RSA-Prüfung entschlüsselt. Der zuvor fehlende Anmeldetoken wurde nach autorisiertem E-Mail-Einmalcode-Login regulär bezogen. Die Abfrage `/vehicle/sound/setting-info` gelang mit `code = 1`.
+
+Die Serverzuordnung lautet:
+
+| Ereignis | Upload-Slot | Maske | Werkstonindex |
+| --- | --- | --- | --- |
+| Benutzerdefinierte Taste (`customize_sound`) | 71 / `0x47` | `0x1000` | 8 |
+| Alarmton (`abnormal_alarm_sound`) | 72 / `0x48` | `0x2000` | 14 |
+| Einschaltton (`power_on_sound`) | 73 / `0x49` | `0x4000` | 31 |
+
+Damit ist insbesondere die Ereignisbezeichnung des im HCI-Mitschnitt beobachteten Slots 71 geklärt. Ein Ausschaltton-Slot wurde nicht zurückgegeben. Weitere Felder: `max_sound_count = 6`, `max_file_duration = 600` mit noch ungeklärter Einheit. Die früheren Abschnitte zur fehlenden Serverantwort dokumentieren den damaligen Stand und sind durch diese erfolgreiche Abfrage überholt.
+
+Der bereinigte vollständige Ablauf steht in `server-success.md`, die maschinenlesbaren Befunde in `server-result.json`. Es gab keine Sound-Schreiboperation und keine Änderung der App oder der Firmware.

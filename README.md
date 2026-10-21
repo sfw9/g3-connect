@@ -207,11 +207,11 @@ Die Routen-Navigation ist gesperrt, solange Testwerte gesendet werden.
 
 ## Eigene Sounds (Web, experimentell)
 
-Im Tab „Roller“ unter „Eigene Sounds“: beliebige Audiodatei wählen, Ausschnitt (max. 4 s) festlegen, Vorschau anhören und hochladen. Grundlage ist die statische Analyse der Segway-App in [sound-upload-analysis.md](dist/sound-upload-analysis.md); am Roller ist der Upload **nicht getestet**.
+Im Tab „Roller“ unter „Eigene Sounds“: beliebige Audiodatei wählen, Ausschnitt (max. 4 s) festlegen, Vorschau anhören, Ereignis wählen und hochladen. Grundlage ist [sound-upload-analysis.md](dist/sound-upload-analysis.md): statische Analyse der Segway-App, ein entschlüsselter Bluetooth-Mitschnitt der Segway-App und die Sound-Einstellungen vom Segway-Server.
 
+- **Slots laut Segway-Server:** Custom-Taste **71** (`0x47`), Alarmton **72** (`0x48`), Einschaltton **73** (`0x49`). Slot 71 ist durch drei vom Roller angenommene Uploads im Mitschnitt bestätigt; für 72 und 73 wurde noch kein Upload beobachtet, sie verlangen deshalb eine Bestätigung. Einen Ausschaltton-Slot meldet der Server nicht. Andere Nummern lassen sich als Experte eintragen.
 - Umwandlung im Browser auf 8 kHz, 16 Bit, Mono (WAV), plus 12-Byte-Vorspann der Segway-App.
-- Übertragung an die VCU: Ankündigung `0x76`, 128-Byte-Abschnitte `0x77` mit der vom Roller gemeldeten Gruppengröße und Pause, Abschluss `0x78` (Index 0, invertierte Bytesumme). Jeder Status ≠ 0 bricht ab; nur im Stillstand.
-- **Die Slot-Nummer für den G3 ist unbekannt** (die Segway-App holt sie von ihrem Server). Sie muss eingetragen werden; es gibt keinen Standardwert. „Trockenlauf“ zeigt alle Werte, ohne etwas zu senden.
-- Custom-Taste auf „Soundeffekt“ stellen (Register `0x4A` = 8, mit Rücklesen und Zurücksetzen) und testweise abspielen (`playSound`, Register `0x77`).
-- **Slot finden ohne Mitschnitt und ohne Segway-App:** Der „Sound-Scanner“ spielt die Nummern nacheinander ab (nur `playSound`, nichts wird geschrieben). Nummern, bei denen ein Ton kommt, sind Werkstöne und werden als belegt markiert. Dann eine stille Nummer als Slot eintragen, den eingebauten Testton (drei aufsteigende Pieptöne) hochladen und mit „Abspielen“ prüfen. Annahme (nicht bestätigt): Abspiel-Nummer = Upload-Slot.
+- Übertragung an die VCU: Ankündigung `0x76`, 128-Byte-Abschnitte `0x77` mit der vom Roller gemeldeten Gruppengröße und Pause (im Mitschnitt 32 Pakete, 30 ms), Abschluss `0x78` (Index 0, invertierte Bytesumme). Jeder Status ≠ 0 bricht ab; nur im Stillstand. „Trockenlauf“ zeigt alle Werte, ohne etwas zu senden.
+- **Eigener Sound oder Werkston:** pro Ereignis ein Bit in Register `0x1F` (Taste `0x1000`, Alarm `0x2000`, Einschalten `0x4000`). Wie die Segway-App löscht der Upload das Bit vorher und setzt es danach (mit Rücklesen, andere Bits bleiben); bei einem Fehler wird der alte Wert zurückgeschrieben. Das Bit lässt sich auch einzeln umschalten.
+- Custom-Taste auf „Soundeffekt“ stellen (Register `0x4A` = 8, mit Rücklesen und Zurücksetzen); danach spielt die Taste Slot 71. `playSound` (Register `0x77`) mit der Slot-Nummer bleibt als unbestätigter Test.
 - Nur am MAX G3 freigegeben.

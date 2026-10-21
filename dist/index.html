@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=22"></script>
+<script type="module" src="app.js?v=23"></script>
 </head>
 <body>
 <header class="topbar">
@@ -127,11 +127,11 @@
  </article>
  <article class="card" aria-labelledby="sound-title">
   <header class="card-head">
-   <div><h2 id="sound-title">Eigene Sounds</h2><p class="sub-title">Hochladen und mit der Custom-Taste abspielen</p></div>
+   <div><h2 id="sound-title">Eigene Sounds</h2><p class="sub-title">Custom-Taste, Alarmton und Einschaltton</p></div>
    <span class="badge">experimentell</span>
   </header>
   <p id="snd-lock" class="callout warn" hidden>Nur am MAX G3 freigegeben.</p>
-  <p class="callout warn">Nicht am Roller getestet. Format und Ablauf stammen aus der statischen Analyse der Segway-App. <strong>Die Slot-Nummer für den G3 ist unbekannt</strong> – die Segway-App bekommt sie von ihrem Server. Ein falscher Slot kann einen vorhandenen Sound überschreiben oder abgelehnt werden.</p>
+  <p class="callout ok">Slots laut Segway-Server für den G3: <strong>Custom-Taste 71, Alarmton 72, Einschaltton 73</strong>. Format und Ablauf sind mit einem Mitschnitt der Segway-App bestätigt (drei angenommene Uploads in Slot 71). Für Slot 72 und 73 wurde noch kein Upload am Roller beobachtet. Einen Slot für den Ausschaltton meldet der Server nicht.</p>
   <div class="field">
    <label for="snd-file">Audiodatei <span class="opt">MP3, WAV, OGG, M4A …</span></label>
    <input id="snd-file" type="file" accept="audio/*">
@@ -145,10 +145,20 @@
   <audio id="snd-preview" controls hidden></audio>
   <p id="snd-info" class="hint small"></p>
   <div class="field">
-   <label for="snd-slot">Slot-Nummer <span class="opt">0–255 · Pflichtfeld, kein Standardwert</span></label>
-   <input id="snd-slot" inputmode="numeric" autocomplete="off" placeholder="z. B. aus eigenem Mitschnitt">
+   <label for="snd-event">Sound für</label>
+   <select id="snd-event">
+    <option value="71" selected>Custom-Taste (Slot 71)</option>
+    <option value="72">Alarmton (Slot 72)</option>
+    <option value="73">Einschaltton (Slot 73)</option>
+    <option value="other">Andere Slot-Nummer (Experten)</option>
+   </select>
   </div>
-  <label class="check"><input id="snd-confirm" type="checkbox"> Ich weiß, dass Slot und Annahme durch den Roller nicht bestätigt sind.</label>
+  <div id="snd-slot-field" class="field" hidden>
+   <label for="snd-slot">Slot-Nummer <span class="opt">0–255</span></label>
+   <input id="snd-slot" inputmode="numeric" autocomplete="off">
+  </div>
+  <p id="snd-slot-info" class="hint small"></p>
+  <label id="snd-confirm-row" class="check" hidden><input id="snd-confirm" type="checkbox"> Ich weiß, dass dieser Slot am Roller noch nicht bestätigt ist.</label>
   <div class="actions">
    <button type="button" id="snd-dry" class="btn" disabled>Trockenlauf</button>
    <button type="button" id="snd-upload" class="btn primary" disabled>Hochladen</button>
@@ -157,28 +167,21 @@
   <progress id="snd-progress" max="1" value="0" hidden></progress>
   <p id="snd-status" class="hint" role="status" aria-live="polite">Audiodatei wählen.</p>
   <details class="sub">
-   <summary>Slot finden (Sound-Scanner)</summary>
+   <summary>Eigener Sound oder Werkston</summary>
    <div class="body stack">
-    <p class="hint">Spielt die Sound-Nummern nacheinander ab, nur Abspielen, nichts wird geschrieben. <strong>Ohne Segway-App:</strong> bei jeder Nummer, bei der etwas zu hören ist, „Hier kam ein Ton“ tippen – das sind Werkstöne, diese Nummern nicht überschreiben. Dann eine stille Nummer daneben als Slot eintragen, den Testton hochladen und mit „Abspielen“ prüfen. Annahme: Abspiel-Nummer und Upload-Slot sind gleich nummeriert (nicht bestätigt).</p>
-    <div class="form-grid">
-     <div class="field"><label for="snd-scan-from">Von</label><input id="snd-scan-from" inputmode="numeric" value="0" autocomplete="off"></div>
-     <div class="field"><label for="snd-scan-to">Bis</label><input id="snd-scan-to" inputmode="numeric" value="255" autocomplete="off"></div>
-     <div class="field span-2"><label for="snd-scan-pause">Pause zwischen Sounds <span class="opt">s</span></label><input id="snd-scan-pause" inputmode="decimal" value="3" autocomplete="off"></div>
-    </div>
-    <div class="scan-now"><span class="readout-label">Gerade gespielt</span><strong id="snd-scan-current">—</strong></div>
+    <p class="hint">Pro Ereignis schaltet ein Bit in Register 0x1F zwischen eigenem Sound und Werkston um (Custom-Taste 0x1000, Alarm 0x2000, Einschalten 0x4000). Der Upload setzt das Bit danach automatisch, wie die Segway-App. Die anderen Bits bleiben unverändert.</p>
+    <p id="snd-mode-state" class="hint">Noch nicht gelesen.</p>
     <div class="actions">
-     <button type="button" id="snd-scan-prev" class="btn" disabled>◀ Zurück</button>
-     <button type="button" id="snd-scan-start" class="btn primary" disabled>Scan starten</button>
-     <button type="button" id="snd-scan-next" class="btn" disabled>Weiter ▶</button>
+     <button type="button" id="snd-mode-read" class="btn" disabled>Status lesen</button>
+     <button type="button" id="snd-mode-on" class="btn primary" disabled>Eigenen Sound verwenden</button>
+     <button type="button" id="snd-mode-off" class="btn" disabled>Werkston verwenden</button>
     </div>
-    <button type="button" id="snd-scan-hit" class="btn primary wide" disabled>Hier kam ein Ton</button>
-    <p id="snd-scan-hits" class="hint">Noch keine Treffer markiert.</p>
    </div>
   </details>
   <details class="sub">
    <summary>Custom-Taste und Abspielen</summary>
    <div class="body stack">
-    <p class="hint">Stellt die Custom-Taste auf „Soundeffekt“ (Register 0x4A = 8, mit Rücklesen). Das überträgt keinen Sound; welcher Slot dabei gespielt wird, legt der Roller fest.</p>
+    <p class="hint">Stellt die Custom-Taste auf „Soundeffekt“ (Register 0x4A = 8, mit Rücklesen). Danach spielt ein Druck auf die Taste den Sound aus Slot 71.</p>
     <p id="snd-key-state" class="hint">Belegung noch nicht gelesen.</p>
     <div class="actions">
      <button type="button" id="snd-key-read" class="btn" disabled>Belegung lesen</button>
@@ -186,7 +189,7 @@
      <button type="button" id="snd-key-restore" class="btn" disabled>Zurücksetzen</button>
     </div>
     <button type="button" id="snd-play" class="btn" disabled>Slot-Nummer abspielen (playSound)</button>
-    <p class="note">„Abspielen“ schreibt die Slot-Nummer in das playSound-Register 0x77. Ob der Roller dort genau diese Nummer erwartet, ist nicht bestätigt.</p>
+    <p class="note">„Abspielen“ schreibt die Slot-Nummer in das playSound-Register 0x77. Ob der Roller dort die Slot-Nummer erwartet, ist nicht bestätigt; sicherer Test ist die Custom-Taste.</p>
    </div>
   </details>
  </article>
