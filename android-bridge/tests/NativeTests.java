@@ -26,19 +26,53 @@ public final class NativeTests {
  }
  static final class Vehicle implements NinebotClient.Wire {
   final BlockingQueue<byte[]> queue=new LinkedBlockingQueue<>();NinebotCrypto peer=new NinebotCrypto();List<byte[]> sent=new ArrayList<>();byte[] password;int pairs;int speed,range=0x9414,accel=1;boolean lateConfirm,pendingPower;int applyDelay,pendingRange;boolean closed;String stage="pre";boolean corruptNext;
+  final Map<Integer,Integer> regs=new HashMap<>();java.io.ByteArrayOutputStream file;int fileSlot=-1,fileLength,fileStatus,finishStatus;byte[] begin=NinebotCrypto.unhex("012000ffffffff1e000000");List<Integer> plays=new ArrayList<>();int dropAcks;
   Vehicle(byte[] stored)throws Exception{password=stored;peer.key(NAME,NinebotCrypto.FW);}
   void reply(int board,int cmd,int index,byte[] data)throws Exception{byte[] p=NinebotCrypto.frame(board,cmd,index,data);p[3]=(byte)board;p[4]=0x3e;byte[] raw=peer.encrypt(p);if(corruptNext){raw[8]^=1;corruptNext=false;}queue.offer(raw);}
   public void write(byte[] raw)throws Exception{if(closed)throw new IllegalStateException("closed");int n=((raw[raw.length-2]&255)<<8)|(raw[raw.length-1]&255);if(peer.session)check(n>peer.counter,"TX advances beyond peer counter");byte[] p=peer.decrypt(raw);sent.add(p);int board=p[4]&255,cmd=p[5]&255,index=p[6]&255;byte[] data=Arrays.copyOfRange(p,7,p.length);
    if(stage.equals("pre")){check(cmd==0x5b,"PRE first");byte[] info=new byte[30];System.arraycopy(CHALLENGE,0,info,0,16);System.arraycopy(NAME,0,info,16,14);reply(4,0x5b,1,info);peer.auth=CHALLENGE;peer.session=true;peer.counter=1;peer.key(password==null?NAME:password,CHALLENGE);stage=password==null?"pair":"auth";return;}
    if(cmd==0x5c){if(password==null)password=data.clone();else same(data,password,"same key across SET_PWD retries");pairs++;reply(4,cmd,0,new byte[0]);if(lateConfirm){pendingPower=true;return;}if(pairs>=2){reply(4,cmd,1,new byte[0]);peer.key(password,CHALLENGE);stage="auth";}return;}
    if(cmd==0x5d){same(data,NAME,"AUTH raw 14-byte serial");reply(4,cmd,1,new byte[0]);stage="ready";return;}
-   check(stage.equals("ready"),"auth before control");if(cmd==1){if(index==0x2f&&applyDelay>0&&--applyDelay==0)range=pendingRange;int value=index==0x57?speed:index==0x2f?range:accel;reply(board,4,index,new byte[]{(byte)value,(byte)(value>>>8)});}
+   check(stage.equals("ready"),"auth before control");if(cmd==1){if(index==0x2f&&applyDelay>0&&--applyDelay==0)range=pendingRange;int value=regs.containsKey(index)?regs.get(index):index==0x57?speed:index==0x2f?range:accel;reply(board,4,index,new byte[]{(byte)value,(byte)(value>>>8)});}
    else if(board==0x23&&index==0){check(data.length==1&&(data[0]==1||data[0]==0),"confirmed SimpleNavi one-byte start/stop");reply(board,cmd,index,new byte[0]);}
    else if(board==0x16&&cmd==2){accel=data[0]&255;reply(board,5,index,new byte[0]);}
+   else if(board==0x16&&cmd==3&&index==0x77){plays.add((data[0]&255)|((data[1]&255)<<8));}
+   else if(board==0x16&&cmd==3&&(index==0x1f||index==0x4a)){regs.put(index,(data[0]&255)|((data[1]&255)<<8));}
    else if(board==0x16&&cmd==3){int value=(data[0]&255)|((data[1]&255)<<8);if(applyDelay>0)pendingRange=value;else range=value;}
+   // File transfer as in the captured Segway app upload: 32 packets per group, 30 ms, status in the index field.
+   else if(board==0x16&&cmd==0x76){fileSlot=index;fileLength=ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).getInt();check(data.length==5&&data[4]==1,"announce = length LE + 01");file=new java.io.ByteArrayOutputStream();reply(board,cmd,fileStatus,begin);}
+   else if(board==0x16&&cmd==0x77){int packet=file.size()/128;check(index==packet%32,"index counts inside the group");check(data.length==Math.min(128,fileLength-file.size()),"128-byte chunks, last one unpadded");file.write(data);if(index==31||file.size()==fileLength){if(dropAcks>0){dropAcks--;file=truncate(file,packet*128);return;}reply(board,cmd,0,new byte[0]);}}
+   else if(board==0x16&&cmd==0x78){check(index==0,"finish index 0");byte[] all=file.toByteArray();check(all.length==fileLength,"all bytes received");same(data,SoundFile.le32(SoundFile.checksum(all)),"inverted byte sum");reply(board,cmd,finishStatus,data);}
   }
   public byte[] take(long ms)throws Exception{if(closed)throw new IllegalStateException("closed");if(ms==0&&pendingPower){pendingPower=false;reply(4,0x5c,1,new byte[0]);peer.key(password,CHALLENGE);stage="auth";}return ms==0?queue.poll():queue.poll(ms,TimeUnit.MILLISECONDS);}
   public void close(){closed=true;}
+ }
+ static java.io.ByteArrayOutputStream truncate(java.io.ByteArrayOutputStream b,int size){java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();out.write(b.toByteArray(),0,size);return out;}
+ static void sound()throws Exception{
+  // Format: one second of silence matches the reference example of the analysis.
+  byte[] silence=SoundFile.payload(SoundFile.wav(new float[8000]));check(silence.length==16056,"silence upload length");
+  same(Arrays.copyOf(silence,12),NinebotCrypto.unhex("0c000000b83e0000401f1001"),"12-byte header");same(SoundFile.beginData(silence.length),NinebotCrypto.unhex("b83e000001"),"announce payload");
+  check(SoundFile.checksum(silence)==0xfffff651,"checksum of the reference example");check(SoundFile.chunks(silence.length)==126,"126 chunks");
+  SoundFile.Flow f=SoundFile.parseBegin(NinebotCrypto.unhex("012000ffffffff1e000000"));check(f.protocol==1&&f.group==32&&f.last==-1&&f.wait==30,"captured begin reply");
+  f=SoundFile.parseBegin(NinebotCrypto.unhex("40008813"));check(f.group==64&&f.wait==0,"legacy reply, 5000 ms becomes 0");check(SoundFile.parseBegin(new byte[0]).group==8,"default group");
+  float[] tone=SoundFile.testTone();check(tone.length==12000,"test tone 1.5 s");float[] cut=SoundFile.prepare(new float[44100*10],44100,1f,9f,true);check(cut.length==32000,"cut to 4 s at 8 kHz");
+  expectFailure(()->SoundFile.prepare(new float[44100],44100,2f,4f,true),"start after the end");
+  // Upload of the captured 26 768-byte size into slot 71 with the custom-button bit.
+  Vehicle v=new Vehicle(PASSWORD);List<String> logs=new ArrayList<>();NinebotClient c=new NinebotClient(v,logs::add);c.authenticate(new String(NAME,StandardCharsets.UTF_8),PASSWORD,k->{});
+  v.regs.put(0x1f,0x1001);v.regs.put(0x4a,6);byte[] payload=new byte[26768];for(int i=0;i<payload.length;i++)payload[i]=(byte)i;int[] progress={0,0};
+  int logBefore=logs.size();c.uploadSound(71,payload,0x1000,(d,t)->{progress[0]=d;progress[1]=t;},()->false);
+  check(v.fileSlot==71&&progress[0]==210&&progress[1]==210,"210 packets into slot 71");check(v.regs.get(0x1f)==0x1001,"bit set again, other bits kept");
+  List<Integer> writes=new ArrayList<>();for(byte[] p:v.sent)if((p[5]&255)==3&&(p[6]&255)==0x1f)writes.add((p[7]&255)|((p[8]&255)<<8));check(writes.equals(Arrays.asList(0x0001,0x1001)),"0x1F cleared before and set after the upload");
+  check(logs.size()-logBefore<30,"data packets are not logged one by one");
+  check(c.customKey(8)==6&&v.regs.get(0x4a)==8,"button action set to sound, previous hazard lights returned");expectFailure(()->c.customKey(9),"unknown action rejected");
+  check(c.soundBits(0x4000,true)==0x5001&&c.soundBits(0x1000,false)==0x4001,"toggle one event bit");
+  int sent=v.sent.size();c.playSound(14);check(v.plays.equals(Arrays.asList(14))&&v.sent.size()==sent+1,"playSound writes only register 0x77");
+  // Failures restore 0x1F; a missing group reply is retried.
+  v.regs.put(0x1f,0x1000);v.finishStatus=3;expectFailure(()->c.uploadSound(71,payload,0x1000,(d,t)->{},()->false),"save failure stops");check(v.regs.get(0x1f)==0x1000,"previous 0x1F restored after failure");v.finishStatus=0;
+  v.fileStatus=1;int before=v.sent.size();expectFailure(()->c.uploadSound(72,payload,0,(d,t)->{},()->false),"refused announce");check(v.sent.size()==before+2,"refusal: only speed read and announce");v.fileStatus=0;
+  v.dropAcks=1;c.uploadSound(73,silence,0,(d,t)->{},()->false);check(v.fileSlot==73,"retried group reply completes");
+  int[] count={0};expectFailure(()->c.uploadSound(71,payload,0,(d,t)->count[0]=d,()->count[0]>=10),"cancel");check(count[0]==10,"cancel stops before the next chunk");
+  v.speed=2;expectFailure(()->c.uploadSound(71,payload,0,(d,t)->{},()->false),"moving scooter refuses upload");
  }
  static MapsState.Sample sample(long time){return new MapsState.Sample(100,3100,900,2,.99f,"Hauptstraße",time);}
  static void protocol()throws Exception{
@@ -142,5 +176,5 @@ public final class NativeTests {
   int infoCount=0,stopCount=0;for(byte[] packet:vehicle.sent){if((packet[5]&255)!=0x71)continue;check((packet[4]&255)==0x23,"manual transmission writes TFT only");int index=packet[6]&255;if(index==3){infoCount++;ByteBuffer b=ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN);check(b.getInt(7)==2345500&&b.getInt(11)==90&&b.getShort(15)==7&&b.getInt(17)==321,"encrypted manual payload carries all configured numeric values");}if(index==0x10||index==0x24){same(Arrays.copyOfRange(packet,7,packet.length),NaviPacket.road("Meine Straße"),"configured manual street arrives in current and next-road fields");}if(index==0&&packet.length==8&&packet[7]==0)stopCount++;}
   check(infoCount==2&&stopCount==1,"encrypted repeats terminate with exactly one confirmed stop");client.close();
  }
- public static void main(String[] args)throws Exception{crypto(args[0]);parsing();notificationFormats();arrivalTimes();placeholderDistance();departuresAndIcons();manualSending();protocol();lifecycle();System.out.println("Android native: "+checks+" checks passed (Python crypto vectors, encrypted fake scooter, pairing, settings, Maps lifecycle, UTF8).");}
+ public static void main(String[] args)throws Exception{crypto(args[0]);parsing();notificationFormats();arrivalTimes();placeholderDistance();departuresAndIcons();manualSending();protocol();sound();lifecycle();System.out.println("Android native: "+checks+" checks passed (Python crypto vectors, encrypted fake scooter, pairing, settings, Maps lifecycle, UTF8).");}
 }

@@ -13,6 +13,8 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.*;
+import android.media.AudioTrack;
+import android.net.Uri;
 import android.os.*;
 import android.provider.Settings;
 import android.util.TypedValue;
@@ -22,6 +24,8 @@ import java.util.*;
 public final class MainActivity extends Activity {
  /** Last values confirmed by the scooter in this connection; 0 / -1 = unknown. */
  static volatile int knownLevel,knownRange=-1;static volatile String settingsNote="";
+ /** Sound jobs run on the service worker; these carry their result to the UI. */
+ static volatile boolean soundBusy,soundCancel;static volatile int soundDone,soundTotal,previousKey=-1,keyRead=-1;static volatile String soundNote="",keyNote="",bitsNote="";
  private static final int PRIMARY=0,SECONDARY=1,DANGER_BUTTON=2,TONAL=3,SELECTED=4;
  private static final int OFFLINE=0,CONNECTING=1,PAIRING=2,CONNECTED=3,NAVIGATING=4,FAILED=5;
  private int BG,SURFACE,SURFACE2,BORDER,BORDER_STRONG,TEXT,MUTED,ACCENT,ACCENT_STRONG,ACCENT_SOFT,ON_ACCENT,DANGER,DANGER_SOFT,SUCCESS,SUCCESS_SOFT,WARN,WARN_SOFT,LOG_BG,LOG_TEXT;
@@ -46,8 +50,8 @@ public final class MainActivity extends Activity {
   LinearLayout column=new LinearLayout(this);column.setOrientation(LinearLayout.VERTICAL);int pad=dp(16);
   column.setOnApplyWindowInsetsListener((view,insets)->{view.setPadding(pad+insets.getSystemWindowInsetLeft(),dp(8)+insets.getSystemWindowInsetTop(),pad+insets.getSystemWindowInsetRight(),dp(24)+insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
   ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setClipToPadding(false);scroll.addView(column);setContentView(scroll);
-  header(column);scooterCard(column);setupCard(column);navigationCard(column);settingsCard(column);logCard(column);infoCard(column);
-  ConnectService.log("G3 Connect Android Beta 17 geöffnet · Android "+Build.VERSION.RELEASE);
+  header(column);scooterCard(column);setupCard(column);navigationCard(column);settingsCard(column);soundCard(column);logCard(column);infoCard(column);
+  ConnectService.log("G3 Connect Android 1.0 geöffnet · Android "+Build.VERSION.RELEASE);
  }
 
  // ── Farben und Systemleisten ─────────────────────────────
@@ -65,7 +69,7 @@ public final class MainActivity extends Activity {
   LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(8),0,dp(4));column.addView(row);
   TextView logo=text("G3",15,ON_ACCENT,Typeface.DEFAULT_BOLD);logo.setGravity(Gravity.CENTER);logo.setBackground(shape(ACCENT,12,0));row.addView(logo,new LinearLayout.LayoutParams(dp(42),dp(42)));
   LinearLayout titles=vertical();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(12);row.addView(titles,lp);
-  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot G3 · F3 · Android Beta 17",12.5f,MUTED,null));
+  titles.addView(text("G3 Connect",20,TEXT,Typeface.DEFAULT_BOLD));titles.addView(text("Ninebot G3 · F3 · Android 1.0",12.5f,MUTED,null));
   chip=text("Offline",13,MUTED,medium());chip.setPadding(dp(12),dp(6),dp(12),dp(6));chip.setCompoundDrawablePadding(dp(8));row.addView(chip);
  }
 
@@ -148,6 +152,108 @@ public final class MainActivity extends Activity {
   settingsNote=pending;render();s.command(c->{try{job.run(c);}catch(Exception e){settingsNote="Nicht übernommen: "+ConnectService.message(e);throw e;}});
  }
 
+ // ── Eigene Sounds ────────────────────────────────────────
+ private static final int PICK_AUDIO=7;
+ private TextView soundSource,soundInfo,soundStatus,uploadButton,cancelButton,keyState,bitsState,scanButton,scanCurrent,hitsText;
+ private Spinner soundTarget,keyAction;private LinearLayout slotRow;private EditText slotField,maskField,startField,lengthField,scanFrom,scanTo,scanPause;private CheckBox normalize;
+ private final List<View> soundWrites=new ArrayList<>();private AudioDecoder.Pcm decoded;private boolean toneSelected;private AudioTrack preview;
+ private boolean scanRunning;private int scanValue,lastPlayed=-1;private final TreeSet<Integer> hits=new TreeSet<>();
+ private final Runnable scanStep=new Runnable(){public void run(){if(!scanRunning)return;int[] r=scanRange();if(scanValue>r[1]){scanRunning=false;notice("Abspielen fertig."+(hits.isEmpty()?"":" Ton gehört bei: "+join(hits)+"."));renderSound();return;}playNumber(scanValue++);handler.postDelayed(this,Math.round(1000*Math.max(1f,number(scanPause,60,3))));}};
+ private void soundCard(LinearLayout column){
+  LinearLayout card=card(column);title(card,"Eigene Sounds","Custom-Taste, Alarmton und Einschaltton · nur im Stillstand");
+  LinearLayout r=row(card,14);cell(r,button("Audiodatei wählen",TONAL,()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("audio/*");try{startActivityForResult(i,PICK_AUDIO);}catch(Exception e){notice("Keine Datei-Auswahl verfügbar.");}}));
+  cell(r,button("Testton (3 Pieptöne)",SECONDARY,()->{toneSelected=true;decoded=null;soundSource.setText("Testton: drei aufsteigende Pieptöne, 1,5 s");renderSound();}));
+  soundSource=text("Noch keine Datei gewählt.",13.5f,MUTED,null);add(card,soundSource,10);
+  LinearLayout times=row(card,4);startField=field(times,"Start (s)","0");lengthField=field(times,"Länge (s, max. 4)","4");
+  normalize=new CheckBox(this);normalize.setText("Lautstärke angleichen");normalize.setTextColor(TEXT);normalize.setButtonTintList(ColorStateList.valueOf(ACCENT));normalize.setChecked(true);add(card,normalize,6);
+  fieldLabel(card,"Sound für");soundTarget=spinner(new String[]{"Custom-Taste (Slot 71)","Alarmton (Slot 72)","Einschaltton (Slot 73)","Anderer Slot"},0);add(card,soundTarget,2);
+  slotRow=row(card,4);slotField=field(slotRow,"Slot (0–255)","");maskField=field(slotRow,"Bit in 0x1F (optional)","");
+  soundInfo=text("",12.5f,MUTED,null);add(card,soundInfo,8);
+  LinearLayout actions=row(card,12);cell(actions,button("Vorschau",SECONDARY,this::previewSound));uploadButton=button("Hochladen",PRIMARY,this::uploadSound);cell(actions,uploadButton);soundWrites.add(uploadButton);
+  cancelButton=button("Upload abbrechen",DANGER_BUTTON,()->soundCancel=true);add(card,cancelButton,8);
+  soundStatus=text("",13.5f,TEXT,medium());add(card,soundStatus,10);
+  divider(card);add(card,text("Eigener Sound oder Werkston",14,MUTED,medium()),0);
+  hint(card,"Ein Bit pro Ereignis in Register 0x1F. Der Upload setzt es automatisch; hier lässt es sich für das oben gewählte Ereignis umschalten.",6);
+  LinearLayout bits=row(card,10);TextView bitsRead=button("Lesen",SECONDARY,()->soundJob(c->{int v=c.read(0x1f);bitsNote=bitsText(v);}));cell(bits,bitsRead);
+  TextView own=button("Eigener Sound",SECONDARY,()->toggleBits(true)),factory=button("Werkston",SECONDARY,()->toggleBits(false));cell(bits,own);cell(bits,factory);soundWrites.add(bitsRead);soundWrites.add(own);soundWrites.add(factory);
+  bitsState=text("",13,MUTED,null);add(card,bitsState,8);
+  divider(card);add(card,text("Custom-Taste belegen",14,MUTED,medium()),0);
+  keyAction=spinner(labels(),7);add(card,keyAction,8);
+  LinearLayout keys=row(card,10);TextView keyReadButton=button("Lesen",SECONDARY,()->soundJob(c->{int v=c.read(0x4a);keyRead=v;keyNote="Aktuell: "+SoundFile.keyName(v);}));cell(keys,keyReadButton);
+  TextView keyWrite=button("Schreiben",PRIMARY,()->{int action=keyAction.getSelectedItemPosition()+1;soundJob(c->{int old=c.customKey(action);if(old!=action)previousKey=old;keyNote="Aktuell: "+SoundFile.keyName(action)+(old!=action?" · vorher "+SoundFile.keyName(old):"");});});cell(keys,keyWrite);
+  TextView keyBack=button("Zurück",SECONDARY,()->{int old=previousKey;if(old<1){notice("Keine vorherige Belegung gemerkt.");return;}soundJob(c->{c.customKey(old);previousKey=-1;keyRead=old;keyNote="Zurückgesetzt auf "+SoundFile.keyName(old);});});cell(keys,keyBack);
+  soundWrites.add(keyReadButton);soundWrites.add(keyWrite);soundWrites.add(keyBack);
+  keyState=text("",13,MUTED,null);add(card,keyState,8);
+  divider(card);add(card,text("Alle Sounds abspielen",14,MUTED,medium()),0);
+  hint(card,"Spielt die Nummern nacheinander mit playSound (Register 0x77) ab. Es wird nichts hochgeladen.",6);
+  LinearLayout range=row(card,4);scanFrom=field(range,"Von","0");scanTo=field(range,"Bis","255");scanPause=field(range,"Pause (s)","3");
+  scanCurrent=text("—",34,ACCENT_STRONG,Typeface.DEFAULT_BOLD);scanCurrent.setGravity(Gravity.CENTER);scanCurrent.setPadding(0,dp(8),0,dp(8));scanCurrent.setBackground(shape(SURFACE2,14,BORDER));add(card,scanCurrent,10);
+  LinearLayout scan=row(card,10);TextView prev=button("◀",SECONDARY,()->step(-1));cell(scan,prev);
+  scanButton=button("Start",PRIMARY,()->{if(scanRunning){scanRunning=false;handler.removeCallbacks(scanStep);}else{scanRunning=true;scanValue=scanRange()[0];handler.post(scanStep);}renderSound();});cell(scan,scanButton);
+  TextView next=button("▶",SECONDARY,()->step(1));cell(scan,next);soundWrites.add(prev);soundWrites.add(scanButton);soundWrites.add(next);
+  TextView hit=button("Hier kam ein Ton",TONAL,()->{if(lastPlayed<0)return;hits.add(lastPlayed);ConnectService.log("Sound abspielen: Ton bei Nummer "+lastPlayed+" gehört.");renderSound();});add(card,hit,8);
+  hitsText=text("",13,MUTED,null);add(card,hitsText,8);
+  soundTarget.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> a,View v,int i,long id){renderSound();}public void onNothingSelected(AdapterView<?> a){}});
+  for(EditText e:new EditText[]{slotField,maskField})e.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence c,int a,int b,int d){}public void onTextChanged(CharSequence c,int a,int b,int d){}public void afterTextChanged(android.text.Editable x){renderSound();}});
+ }
+ @Override protected void onActivityResult(int code,int result,Intent data){
+  super.onActivityResult(code,result,data);if(code!=PICK_AUDIO||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();
+  soundSource.setText("Datei wird gelesen …");
+  new Thread(()->{try{AudioDecoder.Pcm pcm=AudioDecoder.decode(this,uri);runOnUiThread(()->{decoded=pcm;toneSelected=false;soundSource.setText(String.format(Locale.GERMANY,"Datei geladen · %.1f s · %d Hz",pcm.seconds(),pcm.rate));renderSound();});}
+   catch(Exception e){runOnUiThread(()->{decoded=null;soundSource.setText("Datei nicht lesbar: "+ConnectService.message(e));renderSound();});}}).start();
+ }
+ /** Selected target: slot and 0x1F mask; slot -1 = invalid input, mask -1 = invalid bit. */
+ private int targetSlot(){int i=soundTarget.getSelectedItemPosition();if(i<3)return SoundFile.SLOTS[i];try{int n=Integer.parseInt(slotField.getText().toString().trim());return n>=0&&n<=255?n:-1;}catch(NumberFormatException e){return -1;}}
+ private int targetMask(){int i=soundTarget.getSelectedItemPosition();if(i<3)return SoundFile.MASKS[i];String t=maskField.getText().toString().trim().toLowerCase(Locale.ROOT);if(t.isEmpty())return 0;
+  try{int n=t.startsWith("0x")?Integer.parseInt(t.substring(2),16):Integer.parseInt(t);return n>0&&n<=0x8000&&(n&(n-1))==0?n:-1;}catch(NumberFormatException e){return -1;}}
+ private float[] samples(){
+  if(toneSelected)return SoundFile.testTone();if(decoded==null)throw new IllegalStateException("Zuerst eine Audiodatei oder den Testton wählen.");
+  return SoundFile.prepare(decoded.mono,decoded.rate,number(startField,3600,0),Math.max(0.2f,number(lengthField,SoundFile.MAX_SECONDS,SoundFile.MAX_SECONDS)),normalize.isChecked());
+ }
+ private void previewSound(){try{float[] s=samples();if(preview!=null)preview.release();preview=AudioDecoder.play(s);}catch(Exception e){notice(ConnectService.message(e));}}
+ private void uploadSound(){
+  int slot=targetSlot(),mask=targetMask(),event=soundTarget.getSelectedItemPosition();
+  if(slot<0||mask<0){notice(slot<0?"Slot-Nummer 0–255 eintragen.":"Bit in 0x1F: genau ein Bit, z. B. 0x8000, oder leer lassen.");return;}
+  final byte[] payload;try{payload=SoundFile.payload(SoundFile.wav(samples()));}catch(Exception e){notice(ConnectService.message(e));return;}
+  Runnable start=()->{soundCancel=false;soundDone=0;soundTotal=SoundFile.chunks(payload.length);soundNote="Upload in Slot "+slot+" läuft …";soundJob(c->{
+    try{c.uploadSound(slot,payload,mask,(d,t)->{soundDone=d;soundTotal=t;},()->soundCancel);String extra=event==1?" Testen: Alarm am Roller auslösen.":event==2?" Testen: Roller aus- und einschalten.":"";
+     // The button only plays the sound if its action is "custom sound"; otherwise it keeps e.g. the hazard lights.
+     if(event==0){int old=c.customKey(SoundFile.KEY_SOUND);if(old!=SoundFile.KEY_SOUND){previousKey=old;extra=" Custom-Taste von "+SoundFile.keyName(old)+" auf Soundeffekt umgestellt.";}keyRead=SoundFile.KEY_SOUND;keyNote="Aktuell: "+SoundFile.keyName(SoundFile.KEY_SOUND);extra+=" Testen: Custom-Taste drücken.";}
+     soundNote="Upload abgeschlossen, Prüfsumme vom Roller bestätigt"+(mask!=0?", eigener Sound aktiv.":".")+extra;
+    }catch(Exception e){soundNote="Upload fehlgeschlagen: "+ConnectService.message(e);throw e;}});};
+  // Slot 71 is confirmed by the capture, 73 by a test on the scooter; others need an explicit confirmation.
+  if(slot==71||slot==73){start.run();return;}
+  AlertDialog d=new AlertDialog.Builder(this).setTitle("Slot "+slot+" nicht bestätigt").setMessage("Ein Upload in diesen Slot wurde am Roller noch nicht beobachtet. Ein unbekannter Slot kann abgelehnt werden oder einen vorhandenen Sound überschreiben."+(mask==0?" Register 0x1F wird nicht verändert.":"")).setPositiveButton("Trotzdem hochladen",(x,y)->start.run()).setNegativeButton("Abbrechen",null).show();
+  d.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ACCENT);d.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ACCENT);
+ }
+ private void toggleBits(boolean custom){int mask=targetMask();if(mask<=0){notice("Für dieses Ziel ist kein Bit in 0x1F bekannt.");return;}soundJob(c->{int v=c.soundBits(mask,custom);bitsNote=bitsText(v);});}
+ private static String bitsText(int v){StringBuilder b=new StringBuilder(String.format(Locale.ROOT,"Register 0x1F = 0x%04x",v));for(int i=0;i<3;i++)b.append(" · ").append(SoundFile.EVENTS[i]).append((v&SoundFile.MASKS[i])!=0?": eigener Sound":": Werkston");return b.toString();}
+ private void soundJob(ConnectService.Job job){
+  ConnectService s=ConnectService.instance;if(s==null||!ConnectService.connected){notice("Zuerst Roller verbinden.");return;}if(soundBusy){notice("Es läuft bereits ein Sound-Befehl.");return;}
+  soundBusy=true;renderSound();s.command(c->{try{job.run(c);}catch(Exception e){if(soundNote.endsWith("läuft …"))soundNote="Fehlgeschlagen: "+ConnectService.message(e);throw e;}finally{soundBusy=false;}});
+ }
+ private void playNumber(int n){lastPlayed=n;scanCurrent.setText(String.valueOf(n));ConnectService s=ConnectService.instance;if(s==null||!ConnectService.connected){scanRunning=false;notice("Zuerst Roller verbinden.");renderSound();return;}s.command(c->{c.playSound(n);ConnectService.log("Sound abspielen: playSound "+n+".");});}
+ private void step(int delta){if(scanRunning){scanRunning=false;handler.removeCallbacks(scanStep);}int[] r=scanRange();playNumber(Math.min(r[1],Math.max(r[0],lastPlayed<0?r[0]:lastPlayed+delta)));renderSound();}
+ private int[] scanRange(){int a=Math.round(number(scanFrom,255,0)),b=Math.round(number(scanTo,255,255));return a<=b?new int[]{a,b}:new int[]{b,a};}
+ private static float number(EditText e,float max,float fallback){try{float v=Float.parseFloat(e.getText().toString().trim().replace(',','.'));return v>=0&&v<=max?v:fallback;}catch(NumberFormatException x){return fallback;}}
+ private static String join(Collection<Integer> values){StringBuilder b=new StringBuilder();for(int v:values){if(b.length()>0)b.append(", ");b.append(v);}return b.toString();}
+ private static String[] labels(){String[] l=new String[8];for(int i=0;i<8;i++)l[i]=SoundFile.keyName(i+1);return l;}
+ private void renderSound(){
+  boolean connected=ConnectService.connected,ready=connected&&writable()&&!soundBusy;
+  for(View v:soundWrites)enable(v,ready||v==scanButton&&scanRunning);enable(uploadButton,ready&&!scanRunning&&(toneSelected||decoded!=null));
+  cancelButton.setVisibility(soundBusy&&soundNote.endsWith("läuft …")?View.VISIBLE:View.GONE);
+  int i=soundTarget.getSelectedItemPosition(),slot=targetSlot(),mask=targetMask();slotRow.setVisibility(i==3?View.VISIBLE:View.GONE);
+  soundInfo.setText(i<3?String.format(Locale.ROOT,"Slot %d · Bit 0x%04x in Register 0x1F · %s",slot,mask,i==0?"am Roller bestätigt; stellt die Custom-Taste danach auf Soundeffekt":i==2?"am Roller bestätigt":"vom Segway-Server gemeldet, noch nicht getestet")
+   :slot<0?"Slot-Nummer 0–255 eintragen.":mask<0?"Bit in 0x1F: genau ein Bit, z. B. 0x8000, oder leer lassen.":"Slot "+slot+(mask==0?" · Register 0x1F bleibt unverändert.":String.format(Locale.ROOT," · Bit 0x%04x wird vorher gelöscht und danach gesetzt.",mask))+" Unbekannte Slots können abgelehnt werden oder einen Sound überschreiben.");
+  String progress=soundBusy&&soundNote.endsWith("läuft …")?" "+soundDone+"/"+soundTotal+" Pakete":"";
+  soundStatus.setText(!connected?"Mit dem Roller verbinden, um Sounds hochzuladen.":!writable()?"Nur am MAX G3 freigegeben.":soundNote+progress);
+  int read=keyRead;if(read>=1&&read<=8){keyRead=-1;if(keyAction.getSelectedItemPosition()!=read-1)keyAction.setSelection(read-1);}
+  keyState.setText(keyNote.isEmpty()?"Belegung noch nicht gelesen.":keyNote);bitsState.setText(bitsNote.isEmpty()?"Noch nicht gelesen.":bitsNote);
+  scanButton.setText(scanRunning?"Stopp":"Start");hitsText.setText(hits.isEmpty()?"Noch keine Nummer markiert.":"Ton gehört bei: "+join(hits));
+ }
+ private EditText field(LinearLayout row,String label,String value){LinearLayout box=vertical();cell(row,box);box.addView(text(label,12.5f,MUTED,medium()));EditText e=new EditText(this);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setSingleLine(true);e.setText(value);e.setContentDescription(label);e.setBackgroundTintList(ColorStateList.valueOf(ACCENT));box.addView(e);return e;}
+ private Spinner spinner(String[] items,int selected){Spinner s=new Spinner(this);ArrayAdapter<String> a=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,items);a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);s.setAdapter(a);s.setSelection(selected);return s;}
+
  // ── Protokoll ────────────────────────────────────────────
  private void logCard(LinearLayout column){
   LinearLayout card=card(column);LinearLayout head=row(card,0);head.setGravity(Gravity.CENTER_VERTICAL);
@@ -162,7 +268,7 @@ public final class MainActivity extends Activity {
  // ── Hinweise ─────────────────────────────────────────────
  private void infoCard(LinearLayout column){
   LinearLayout card=card(column);TextView head=text("Hinweise und Lizenzen  ▾",15,TEXT,medium());add(card,head,0);
-  TextView body=text("Fehlt die Gesamt-Reststrecke in Maps, sendet die App 1337 km als festen Platzhalter. Abbiegedistanz und Richtung kommen weiterhin aus Maps.\n\nAndere Bluetooth-Apps vor dem Verbinden schließen. Bei Bedarf G3 Connect von der Akkuoptimierung ausnehmen.\n\nBeta: Google-Maps-Formate und Pfeilerkennung können je nach Version abweichen. Nicht erkennbare Hinweise stoppen die Übertragung. Die G3-Pakete sind am Roller bestätigt; Bluetooth und Maps-Erfassung wurden auf Android 16 bestätigt; neue Display-Funktionen am Roller prüfen.\n\nAndere App-Benachrichtigungen werden vor dem Lesen gefiltert. Kopplungsschlüssel bleiben im privaten App-Speicher. Keine Firmware-Updates. Modell: OpenDash / KTM-Nav-GEN3 (MIT); TensorFlow Lite (Apache 2.0). Lizenzen sind im APK und im Quellcode enthalten.",13,MUTED,null);
+  TextView body=text("Fehlt die Gesamt-Reststrecke in Maps, sendet die App 1337 km als festen Platzhalter. Abbiegedistanz und Richtung kommen weiterhin aus Maps.\n\nAndere Bluetooth-Apps vor dem Verbinden schließen. Bei Bedarf G3 Connect von der Akkuoptimierung ausnehmen.\n\nGoogle-Maps-Formate und Pfeilerkennung können je nach Version abweichen. Nicht erkennbare Hinweise stoppen die Übertragung. Die G3-Pakete sind am Roller bestätigt; Bluetooth und Maps-Erfassung wurden auf Android 16 bestätigt; neue Display-Funktionen am Roller prüfen.\n\nAndere App-Benachrichtigungen werden vor dem Lesen gefiltert. Kopplungsschlüssel bleiben im privaten App-Speicher. Keine Firmware-Updates. Modell: OpenDash / KTM-Nav-GEN3 (MIT); TensorFlow Lite (Apache 2.0). Lizenzen sind im APK und im Quellcode enthalten.",13,MUTED,null);
   body.setVisibility(View.GONE);add(card,body,10);
   head.setOnClickListener(v->{boolean open=body.getVisibility()!=View.VISIBLE;body.setVisibility(open?View.VISIBLE:View.GONE);head.setText(open?"Hinweise und Lizenzen  ▴":"Hinweise und Lizenzen  ▾");});
  }
@@ -209,7 +315,7 @@ public final class MainActivity extends Activity {
   int fg=live||ConnectService.manualActive?ON_ACCENT:TEXT;navMain.setTextColor(fg);navRoad.setTextColor(fg);navMeta.setTextColor(live||ConnectService.manualActive?ON_ACCENT:MUTED);navMeta.setAlpha(live?.85f:1f);
   manualState.setText(ConnectService.manualStatus);manualStop.setVisibility(ConnectService.manualActive?View.VISIBLE:View.GONE);
   // Einstellungen
-  for(View v:needsConnection)enable(v,connected);
+  for(View v:needsConnection)enable(v,connected);renderSound();
   for(View v:levels)enable(v,connected&&writable());for(View v:ranges)enable(v,connected&&writable());
   for(int i=0;i<3;i++)style(levels[i],knownLevel==i+1?SELECTED:SECONDARY);
   style(ranges[0],knownRange==1?SELECTED:SECONDARY);style(ranges[1],knownRange==0?SELECTED:SECONDARY);
@@ -276,7 +382,8 @@ public final class MainActivity extends Activity {
  private void notice(String text){Toast.makeText(this,text,Toast.LENGTH_LONG).show();ConnectService.log(text);}
  private void clip(String label,String value){((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText(label,value));}
  @Override public void onResume(){super.onResume();handler.removeCallbacks(refresh);handler.post(refresh);}
- @Override public void onPause(){stopScan();handler.removeCallbacks(refresh);super.onPause();}
+ @Override public void onPause(){stopScan();handler.removeCallbacks(refresh);if(scanRunning){scanRunning=false;handler.removeCallbacks(scanStep);}super.onPause();}
+ @Override public void onDestroy(){if(preview!=null)preview.release();super.onDestroy();}
 
  // ── Bausteine ────────────────────────────────────────────
  private int dp(float v){return Math.round(v*getResources().getDisplayMetrics().density);}

@@ -31,7 +31,7 @@ final class BleWire implements NinebotClient.Wire {
  }
  private void waitFor(CountDownLatch latch,long ms)throws Exception{if(!latch.await(ms,TimeUnit.MILLISECONDS))throw new IOException("Bluetooth-Zeitlimit überschritten.");check();}
  private void check()throws IOException{if(closed||failure!=null)throw new IOException(failure==null?"Bluetooth-Verbindung geschlossen.":failure);}
- @Override public void write(byte[] raw)throws Exception{check();if(raw.length>mtu-3)throw new IOException("Paket überschreitet die GATT-MTU.");written=new CountDownLatch(1);writeStatus=-1;int type=(tx.getProperties()&BluetoothGattCharacteristic.PROPERTY_WRITE)!=0?BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT:BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
+ @Override public void write(byte[] raw)throws Exception{check();if(raw.length>mtu-3)throw new IOException("Paket ("+raw.length+" B) überschreitet die GATT-MTU ("+mtu+"). Sound-Uploads brauchen MTU 144.");written=new CountDownLatch(1);writeStatus=-1;int type=(tx.getProperties()&BluetoothGattCharacteristic.PROPERTY_WRITE)!=0?BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT:BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
   boolean queued;if(Build.VERSION.SDK_INT>=33)queued=gatt.writeCharacteristic(tx,raw,type)==BluetoothStatusCodes.SUCCESS;else{tx.setWriteType(type);tx.setValue(raw);queued=gatt.writeCharacteristic(tx);}if(!queued)throw new IOException("GATT-Schreiben abgelehnt.");waitFor(written,5000);if(writeStatus!=BluetoothGatt.GATT_SUCCESS)throw new IOException("GATT-Schreibfehler "+writeStatus);written=null;
  }
  @Override public byte[] take(long timeout)throws Exception{check();byte[] b=timeout==0?incoming.poll():incoming.poll(timeout,TimeUnit.MILLISECONDS);check();return b;}

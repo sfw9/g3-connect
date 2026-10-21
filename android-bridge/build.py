@@ -26,9 +26,9 @@ with zipfile.ZipFile(unsigned,'a',zipfile.ZIP_DEFLATED)as z:
  for p in (deps/'tflite/jni').glob('*/*.so'):z.write(p,'lib/'+str(p.relative_to(deps/'tflite/jni')))
  for p in (root/'licenses').glob('*'):z.write(p,'assets/licenses/'+p.name)
 aligned=work/'aligned.apk';run([tools/'zipalign','-f','4',unsigned,aligned])
-key=deps/'g3-beta-signing.jks'
-if not key.exists():run(['keytool','-genkeypair','-keystore',key,'-storepass','android','-keypass','android','-alias','g3beta','-keyalg','RSA','-keysize','2048','-validity','3650','-dname','CN=G3 Connect Beta'])
+key=deps/'g3-signing.jks'
+if not key.exists():run(['keytool','-genkeypair','-keystore',key,'-storepass','android','-keypass','android','-alias','g3connect','-keyalg','RSA','-keysize','2048','-validity','3650','-dname','CN=G3 Connect'])
 out=root.parent/'dist/g3-connect.apk';out.parent.mkdir(parents=True,exist_ok=True)
-run([tools/'apksigner','sign','--v4-signing-enabled','false','--ks',key,'--ks-pass','pass:android','--key-pass','pass:android','--ks-key-alias','g3beta','--out',out,aligned])
+run([tools/'apksigner','sign','--v4-signing-enabled','false','--ks',key,'--ks-pass','pass:android','--key-pass','pass:android','--ks-key-alias','g3connect','--out',out,aligned])
 run([tools/'apksigner','verify','--verbose',out])
 print('APK:',out,'bytes:',out.stat().st_size)

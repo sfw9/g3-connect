@@ -142,7 +142,7 @@ $('reveal-key').addEventListener('click',()=>{const showing=$('pairing-key').typ
 function download(content,name,type) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('save-key').addEventListener('click',()=>download($('pairing-key').value+'\n','ninebot-pairing-key.txt','text/plain'));
 $('download-log').addEventListener('click',()=>download(logs.join('\n')+'\n','g3-log.txt','text/plain'));
-$('download-json').addEventListener('click',()=>download(JSON.stringify({app:'G3 Connect Beta 16',webBluetooth:supported,browser:navigator.userAgent,generation:client?.generation||null,connected:!!client?.authenticated,currentLevel:current,rangeDisplay,displayDiagnostics,log:logs},null,2),'g3-diagnose.json','application/json'));
+$('download-json').addEventListener('click',()=>download(JSON.stringify({app:'G3 Connect',webBluetooth:supported,browser:navigator.userAgent,generation:client?.generation||null,connected:!!client?.authenticated,currentLevel:current,rangeDisplay,displayDiagnostics,log:logs},null,2),'g3-diagnose.json','application/json'));
 $('copy-log').addEventListener('click',async()=>{
   try {await navigator.clipboard.writeText($('log').value);$('log-feedback').textContent='Log kopiert.';}
   catch {$('log').focus();$('log').select();$('log-feedback').textContent='Log markiert. Bitte mit Strg+C oder der Kopierfunktion des Browsers kopieren.';}
@@ -153,7 +153,7 @@ window.addEventListener('pagehide',()=>client?.disconnect());
 navigation=installNavigation({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log});
 sound=installSoundUI({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log,writable});
 manual=installManualSender({getClient:()=>client,isBusy:()=>busy,setBusy:value=>{busy=value;update();},log,beforeStart:()=>navigation.stop('Navigation für Testwerte beendet.')});
-log('G3 Logger Beta 16 gestartet.');
+log('G3 Logger gestartet.');
 log(`Browser: ${navigator.userAgent}`);
 log(`HTTPS/localhost: ${window.isSecureContext}; Web Bluetooth: ${!!navigator.bluetooth}; WebCrypto: ${!!crypto.subtle}.`);
 if(!supported){log('Web Bluetooth nicht verfügbar.','ERROR');status('Web Bluetooth nicht verfügbar',!window.isSecureContext?'Öffne diese App über HTTPS oder localhost. Eine normale HTTP-Adresse kann Bluetooth nicht verwenden.':'Nutze Chrome oder Edge auf einem Gerät mit Bluetooth-Unterstützung, z. B. Chrome auf Android. Safari auf iPhone und Firefox können diese Verbindung nicht herstellen.','error');$('connection-hint').textContent='Dieser Browser kann keine Bluetooth-Verbindung herstellen.';}

@@ -12,13 +12,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=27"></script>
+<script type="module" src="app.js?v=28"></script>
 </head>
 <body>
 <header class="topbar">
  <div class="brand">
   <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><g><circle cx="9.5" cy="21.5" r="2.5"/><circle cx="22.5" cy="21.5" r="2.5"/><path d="M9.5 21.5h8.5l3.2-12H24.5M21.2 9.5h-3"/></g></svg>
-  <div class="brand-text"><span class="brand-name">G3 Connect</span><span class="brand-sub">Ninebot G3 · F3 · Beta 16</span></div>
+  <div class="brand-text"><span class="brand-name">G3 Connect</span><span class="brand-sub">Ninebot G3 · F3</span></div>
  </div>
  <nav class="tabs" role="tablist" aria-label="Bereiche">
   <button type="button" role="tab" id="tab-scooter" data-tab="scooter" aria-controls="panel-scooter" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M5.5 17.5h8l3-11H20M16.5 6.5h-3"/></svg><span>Roller</span></button>
@@ -379,10 +379,10 @@
 <section id="panel-android" class="panel cols" role="tabpanel" aria-labelledby="tab-android" data-panel="android" hidden>
 
  <article class="card promo span-rows" aria-labelledby="android-title">
-  <span class="badge">Android-App · Beta 17</span>
+  <span class="badge">Android-App 1.0</span>
   <h2 id="android-title">Google Maps direkt am Roller</h2>
   <p>Die native App koppelt selbst per Bluetooth und überträgt die Abbiegehinweise aus Google Maps im Hintergrund auf das G3-Display. Chrome kann geschlossen bleiben, kein Google-API-Schlüssel nötig.</p>
-  <a class="btn primary lg" href="g3-connect.apk?v=17" download>
+  <a class="btn primary lg" href="g3-connect.apk?v=18" download>
    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
    G3 Connect herunterladen
   </a>
@@ -392,10 +392,10 @@
    <li><h3>Freigaben</h3><p>Benachrichtigungszugriff und Bluetooth erlauben. Roller suchen, verbinden und bei der Aufforderung die Power-Taste kurz drücken.</p></li>
    <li><h3>Losfahren</h3><p>„Google Maps automatisch am G3 starten / beenden“ eingeschaltet lassen. In Google Maps eine Navigation starten – G3 Connect sendet die Hinweise direkt.</p></li>
   </ol>
-  <p class="callout warn">Neue Android-Beta: gebaut und mit simuliertem Roller geprüft, noch nicht auf einem Android-Gerät getestet. Die TFT-Pakete funktionieren laut deinem Test; die Erkennung der Google-Maps-Hinweise muss auf deinem Handy geprüft werden. Nicht erkennbare oder fehlende Hinweise stoppen die Display-Übertragung.</p>
+  <p class="callout warn">Version 1.0 hat eine neue Signatur: Eine ältere G3 Connect / G3 Maps Bridge vorher deinstallieren und den Roller danach neu koppeln.</p>
   <div class="links">
    <a href="g3-connect-android-source.zip" download>Quellcode und Lizenzen</a>
-   <a href="android-readme.md">Einrichtung und Grenzen</a>
+   <a href="android-readme.md">Anleitung (englisch)</a>
    <a href="g3-connect.sha256">SHA-256-Prüfsumme</a>
   </div>
  </article>
@@ -403,11 +403,8 @@
  <article class="card" aria-labelledby="news-title">
   <header class="card-head"><div><h2 id="news-title">Neuigkeiten</h2></div></header>
   <ol class="timeline">
-   <li><span class="badge accent">Beta 17</span><p>Neu gestaltete Android-App: Statusanzeige mit hervorgehobener Power-Tasten-Aufforderung, Einrichtungs-Checkliste, Live-Abbiegepfeil mit Entfernung und Straße, Auswahlknöpfe für Beschleunigung und Reichweitenanzeige mit zurückgelesenem Wert, Hell-/Dunkelmodus und eigenes App-Symbol.</p></li>
-   <li><span class="badge">Beta 16</span><p>„Manuell senden / Dauersenden …“ erlaubt eigene Richtung, Straße, Abbiegedistanz, Restzeit und Reststrecke. Einmal senden oder jede Sekunde wiederholen; Sendedauer 0 = bis Stopp. Funktioniert auch ohne Google Maps.</p></li>
-   <li><span class="badge">Beta 15</span><p>Startmeldungen wie „Head towards …“ und unmittelbare Abbiegeanweisungen funktionieren ohne Meterangabe. Dunkle Navigationssymbole werden vor der Bilderkennung normalisiert. Live-Navigation lässt sich auch während der Fahrt fortsetzen.</p></li>
-   <li><span class="badge">Beta 14</span><p>Fehlt die Gesamt-Reststrecke, sendet die App fest 1337 km als Platzhalter. Abbiegepfeil und Entfernung bis zur Kurve bleiben aus Maps; Restfahrzeit wird bei Bedarf aus Ankunft minus Handy-Uhrzeit geschätzt.</p></li>
-   <li><span class="badge">Beta 12</span><p>Kombinierte Hinweise wie „350 m · Turn right onto Aggerstraße“ werden aus dem Maps-Text erkannt. Bei fehlenden Angaben in der Android-App „Maps-Diagnose kopieren“ verwenden. Diese Diagnose enthält den Navigationstext und Straßennamen.</p></li>
+   <li><span class="badge accent">1.0</span><p>Eigene Sounds per Bluetooth: Audiodatei oder Testton für Custom-Taste, Alarmton oder Einschaltton hochladen, eigener Sound oder Werkston umschalten, Custom-Taste mit allen acht Aktionen belegen, alle Sounds nacheinander abspielen. Neue Signatur: alte Version vorher deinstallieren.</p></li>
+   <li><span class="badge">Vorher</span><p>Neu gestaltete Oberfläche, manuelles Senden ans Display, 1337-km-Platzhalter für fehlende Reststrecke, Erkennung von Start- und Abbiegeanweisungen aus Google Maps.</p></li>
   </ol>
  </article>
 
@@ -417,7 +414,7 @@
    <li>Vor dem Losfahren verbinden und auf den ersten Pfeil warten.</li>
    <li>Beschleunigung, Reichweitenanzeige, Displaytest und Logger sind auch in der Android-App enthalten.</li>
    <li>Benachrichtigungszugriff unter Android 13+ gesperrt? In den App-Infos „Eingeschränkte Einstellungen zulassen“.</li>
-   <li>Ein Wechsel aus der alten G3 Maps Bridge ist als Update möglich; die App heißt danach G3 Connect.</li>
+   <li>Eigene Sounds hochladen, Custom-Taste belegen und alle Sounds abspielen geht auch in der Android-App.</li>
   </ul>
  </article>
 </section>
