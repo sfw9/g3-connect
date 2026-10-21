@@ -204,3 +204,13 @@ Im Tab „Navigation“ unter „Testwerte senden“ lassen sich beliebige Werte
 - **Alle Richtungen testen:** zeigt alle 11 bekannten Richtungen oder alle Symbolcodes 0–31 nacheinander (Sekunden je Symbol einstellbar). Als Straßenname erscheint z. B. „3/11 RECHTS“, damit am Display die Zuordnung sichtbar ist; jeder Schritt steht auch im Logger.
 
 Die Routen-Navigation ist gesperrt, solange Testwerte gesendet werden.
+
+## Eigene Sounds (Web, experimentell)
+
+Im Tab „Roller“ unter „Eigene Sounds“: beliebige Audiodatei wählen, Ausschnitt (max. 4 s) festlegen, Vorschau anhören und hochladen. Grundlage ist die statische Analyse der Segway-App in [sound-upload-analysis.md](dist/sound-upload-analysis.md); am Roller ist der Upload **nicht getestet**.
+
+- Umwandlung im Browser auf 8 kHz, 16 Bit, Mono (WAV), plus 12-Byte-Vorspann der Segway-App.
+- Übertragung an die VCU: Ankündigung `0x76`, 128-Byte-Abschnitte `0x77` mit der vom Roller gemeldeten Gruppengröße und Pause, Abschluss `0x78` (Index 0, invertierte Bytesumme). Jeder Status ≠ 0 bricht ab; nur im Stillstand.
+- **Die Slot-Nummer für den G3 ist unbekannt** (die Segway-App holt sie von ihrem Server). Sie muss eingetragen werden; es gibt keinen Standardwert. „Trockenlauf“ zeigt alle Werte, ohne etwas zu senden.
+- Custom-Taste auf „Soundeffekt“ stellen (Register `0x4A` = 8, mit Rücklesen und Zurücksetzen) und testweise abspielen (`playSound`, Register `0x77`).
+- Nur am MAX G3 freigegeben.

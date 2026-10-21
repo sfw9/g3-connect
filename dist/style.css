@@ -405,6 +405,12 @@ summary .badge { font-weight: 600; }
 .wide-actions { align-self: stretch; }
 @media (max-width: 380px) { .form-grid { grid-template-columns: minmax(0, 1fr); } }
 
+/* ── Eigene Sounds ───────────────────────────── */
+#snd-preview { width: 100%; }
+#snd-progress { width: 100%; height: 10px; accent-color: var(--accent); }
+input[type="file"] { padding: 8px; }
+.card-head .badge { flex: none; }
+
 /* ── Android ────────────────────────────────── */
 .promo h2 { font-size: 24px; font-weight: 780; letter-spacing: -.02em; }
 .promo > p:not(.meta):not(.callout) { color: var(--muted); }

@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=19"></script>
+<script type="module" src="app.js?v=20"></script>
 </head>
 <body>
 <header class="topbar">
@@ -122,6 +122,51 @@
     <p class="hint">Erfasst Firmwareversionen und Display-Einstellungen zur Zuordnung. Liest ausschließlich; die Anzeige am Roller wird dabei nicht verändert. Das Ergebnis ist im JSON-Diagnose-Download enthalten.</p>
     <button type="button" id="read-display-diagnostics" class="btn" disabled>Display-Diagnose lesen</button>
     <pre id="display-diagnostic-output" class="code"></pre>
+   </div>
+  </details>
+ </article>
+ <article class="card" aria-labelledby="sound-title">
+  <header class="card-head">
+   <div><h2 id="sound-title">Eigene Sounds</h2><p class="sub-title">Hochladen und mit der Custom-Taste abspielen</p></div>
+   <span class="badge">experimentell</span>
+  </header>
+  <p id="snd-lock" class="callout warn" hidden>Nur am MAX G3 freigegeben.</p>
+  <p class="callout warn">Nicht am Roller getestet. Format und Ablauf stammen aus der statischen Analyse der Segway-App. <strong>Die Slot-Nummer für den G3 ist unbekannt</strong> – die Segway-App bekommt sie von ihrem Server. Ein falscher Slot kann einen vorhandenen Sound überschreiben oder abgelehnt werden.</p>
+  <div class="field">
+   <label for="snd-file">Audiodatei <span class="opt">MP3, WAV, OGG, M4A …</span></label>
+   <input id="snd-file" type="file" accept="audio/*">
+  </div>
+  <div class="form-grid">
+   <div class="field"><label for="snd-start">Start <span class="opt">s</span></label><input id="snd-start" inputmode="decimal" value="0" autocomplete="off"></div>
+   <div class="field"><label for="snd-seconds">Länge <span class="opt">s · max. 4</span></label><input id="snd-seconds" inputmode="decimal" value="4" autocomplete="off"></div>
+  </div>
+  <label class="check"><input id="snd-normalize" type="checkbox" checked> Lautstärke angleichen</label>
+  <audio id="snd-preview" controls hidden></audio>
+  <p id="snd-info" class="hint small"></p>
+  <div class="field">
+   <label for="snd-slot">Slot-Nummer <span class="opt">0–255 · Pflichtfeld, kein Standardwert</span></label>
+   <input id="snd-slot" inputmode="numeric" autocomplete="off" placeholder="z. B. aus eigenem Mitschnitt">
+  </div>
+  <label class="check"><input id="snd-confirm" type="checkbox"> Ich weiß, dass Slot und Annahme durch den Roller nicht bestätigt sind.</label>
+  <div class="actions">
+   <button type="button" id="snd-dry" class="btn" disabled>Trockenlauf</button>
+   <button type="button" id="snd-upload" class="btn primary" disabled>Hochladen</button>
+   <button type="button" id="snd-cancel" class="btn danger" hidden>Abbrechen</button>
+  </div>
+  <progress id="snd-progress" max="1" value="0" hidden></progress>
+  <p id="snd-status" class="hint" role="status" aria-live="polite">Audiodatei wählen.</p>
+  <details class="sub">
+   <summary>Custom-Taste und Abspielen</summary>
+   <div class="body stack">
+    <p class="hint">Stellt die Custom-Taste auf „Soundeffekt“ (Register 0x4A = 8, mit Rücklesen). Das überträgt keinen Sound; welcher Slot dabei gespielt wird, legt der Roller fest.</p>
+    <p id="snd-key-state" class="hint">Belegung noch nicht gelesen.</p>
+    <div class="actions">
+     <button type="button" id="snd-key-read" class="btn" disabled>Belegung lesen</button>
+     <button type="button" id="snd-key-set" class="btn primary" disabled>Auf Soundeffekt stellen</button>
+     <button type="button" id="snd-key-restore" class="btn" disabled>Zurücksetzen</button>
+    </div>
+    <button type="button" id="snd-play" class="btn" disabled>Slot-Nummer abspielen (playSound)</button>
+    <p class="note">„Abspielen“ schreibt die Slot-Nummer in das playSound-Register 0x77. Ob der Roller dort genau diese Nummer erwartet, ist nicht bestätigt.</p>
    </div>
   </details>
  </article>
