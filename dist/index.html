@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=25"></script>
+<script type="module" src="app.js?v=26"></script>
 </head>
 <body>
 <header class="topbar">
@@ -153,10 +153,15 @@
     <option value="other">Andere Slot-Nummer (Experten)</option>
    </select>
   </div>
-  <div id="snd-slot-field" class="field" hidden>
-   <label for="snd-slot">Slot-Nummer <span class="opt">0–255</span></label>
-   <input id="snd-slot" inputmode="numeric" autocomplete="off">
+  <div id="snd-slot-field" class="stack" hidden>
+   <div class="form-grid">
+    <div class="field"><label for="snd-slot">Slot-Nummer <span class="opt">0–255</span></label><input id="snd-slot" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label for="snd-mask">Bit in 0x1F <span class="opt">optional, z. B. 0x8000</span></label><input id="snd-mask" autocomplete="off" spellcheck="false"></div>
+    <div class="field span-2"><label for="snd-own-name">Name <span class="opt">zum Speichern</span></label><input id="snd-own-name" autocomplete="off" placeholder="z. B. Ausschaltton?"></div>
+   </div>
+   <button type="button" id="snd-own-save" class="btn" disabled>Als eigenen Slot speichern</button>
   </div>
+  <button type="button" id="snd-own-delete" class="btn" hidden>Eigenen Slot löschen</button>
   <p id="snd-slot-info" class="hint small"></p>
   <label id="snd-confirm-row" class="check" hidden><input id="snd-confirm" type="checkbox"> Ich weiß, dass dieser Slot am Roller noch nicht bestätigt ist.</label>
   <div class="actions">
@@ -166,6 +171,26 @@
   </div>
   <progress id="snd-progress" max="1" value="0" hidden></progress>
   <p id="snd-status" class="hint" role="status" aria-live="polite">Audiodatei wählen.</p>
+  <details class="sub">
+   <summary>Sounds vom Roller aufnehmen (Dumper)</summary>
+   <div class="body stack">
+    <p class="hint">Ein Befehl, um Sounds digital vom Roller zu lesen, ist nicht bekannt. Der Dumper spielt deshalb jede Nummer mit playSound (Register 0x77) ab und nimmt sie über das Mikrofon des Handys auf. Es wird nichts hochgeladen und nichts anderes geschrieben. Handy nah an den Lautsprecher des Rollers, ruhige Umgebung.</p>
+    <div class="form-grid">
+     <div class="field"><label for="snd-dump-from">Von</label><input id="snd-dump-from" inputmode="numeric" value="0" autocomplete="off"></div>
+     <div class="field"><label for="snd-dump-to">Bis</label><input id="snd-dump-to" inputmode="numeric" value="80" autocomplete="off"></div>
+     <div class="field span-2"><label for="snd-dump-seconds">Aufnahme je Nummer <span class="opt">s</span></label><input id="snd-dump-seconds" inputmode="decimal" value="3" autocomplete="off"></div>
+    </div>
+    <label class="check"><input id="snd-dump-skip" type="checkbox" checked> Nummern ohne erkannten Ton nicht behalten</label>
+    <div class="actions">
+     <button type="button" id="snd-dump-start" class="btn primary" disabled>Aufnahme starten</button>
+     <button type="button" id="snd-dump-stop" class="btn danger" hidden>Stoppen</button>
+     <button type="button" id="snd-dump-zip" class="btn" disabled>Alle als ZIP</button>
+    </div>
+    <progress id="snd-dump-progress" max="1" value="0" hidden></progress>
+    <p id="snd-dump-status" class="hint" role="status" aria-live="polite">Noch nichts aufgenommen.</p>
+    <ul id="snd-dump-list" class="dump-list"></ul>
+   </div>
+  </details>
   <details class="sub">
    <summary>Eigener Sound oder Werkston</summary>
    <div class="body stack">

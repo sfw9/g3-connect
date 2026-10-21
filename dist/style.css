@@ -407,7 +407,7 @@ summary .badge { font-weight: 600; }
 
 /* ── Eigene Sounds ───────────────────────────── */
 #snd-preview { width: 100%; }
-#snd-progress { width: 100%; height: 10px; accent-color: var(--accent); }
+#snd-progress, #snd-dump-progress { width: 100%; height: 10px; accent-color: var(--accent); }
 input[type="file"] { padding: 8px; }
 .card-head .badge { flex: none; }
 
@@ -466,3 +466,8 @@ input[type="file"] { padding: 8px; }
   .inline { flex-wrap: wrap; }
   .inline > .btn { flex: 1 1 100%; }
 }
+
+.dump-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; align-self: stretch; }
+.dump-list li { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.dump-list audio { width: 100%; }
+.dump-list .actions { margin: 0; }
