@@ -1,4 +1,4 @@
-# G3 Connect
+# G3 Connect (research & basic implementation by ChatGPT Sol 6.1. Android App, Design and final implementation: Claude Opus 5.5 & 4.8)
 
 Control your Ninebot MAX G3 over Bluetooth, without the Segway app or account. It has two parts:
 
