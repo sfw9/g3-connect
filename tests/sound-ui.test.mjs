@@ -14,7 +14,8 @@ test('event picker: slot 71 uploads without confirmation, 72/73 and manual slots
  globalThis.URL=class extends URL{static createObjectURL(){return 'blob:x';}static revokeObjectURL(){}};
  t.after(()=>Object.assign(globalThis,old));
  const regs=new Map([[0x1f,0x0000]]),writes=[];
- const client={authenticated:true,async read(b,i){return regs.get(i)??0;},async writeNoReply(b,i,v){writes.push([b,i,v]);regs.set(i,v);}};
+ const client={authenticated:true,async read(b,i){return regs.get(i)??0;},async writeNoReply(b,i,v){writes.push([b,i,v]);regs.set(i,v);},
+  async sendUnacknowledged(){},async request(b,cmd){return {index:0,payload:cmd===0x76?Uint8Array.of(0x40,0,0,0):new Uint8Array()};}};
  let busy=false;installSoundUI({getClient:()=>client,isBusy:()=>busy,setBusy:v=>{busy=v;},log(){},writable:()=>true});
  const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
  const pick=v=>{nodes.get('snd-event').value=v;nodes.get('snd-event').dispatchEvent(new Event('change'));};
@@ -29,4 +30,12 @@ test('event picker: slot 71 uploads without confirmation, 72/73 and manual slots
  assert.deepEqual(writes,[[0x16,0x1f,0x4000]]);assert.match(nodes.get('snd-mode-state').textContent,/Einschaltton eigener Sound/);
  nodes.get('snd-dry').dispatchEvent(new Event('click'));
  assert.match(nodes.get('snd-status').textContent,/Trockenlauf Slot 73 \(Einschaltton\): Register 0x1F Bit 0x4000 löschen.*Nichts gesendet/);
+ // Upload for the custom button also assigns the button action; the previous action (e.g. hazard lights) can be restored.
+ regs.set(0x4a,5);writes.length=0;pick('71');
+ nodes.get('snd-upload').dispatchEvent(new Event('click'));await new Promise(r=>setTimeout(r,50));await flush();
+ assert.deepEqual(writes.filter(w=>w[1]===0x4a),[[0x16,0x4a,8]]);assert.equal(regs.get(0x1f)&0x1000,0x1000);
+ assert.match(nodes.get('snd-status').textContent,/Upload abgeschlossen.*von Aktion 5 auf Soundeffekt umgestellt/);
+ assert.equal(nodes.get('snd-key-restore').disabled,false);
+ nodes.get('snd-key-restore').dispatchEvent(new Event('click'));await flush();
+ assert.equal(regs.get(0x4a),5);assert.match(nodes.get('snd-status').textContent,/zurückgesetzt/);
 });

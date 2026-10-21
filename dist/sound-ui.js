@@ -1,4 +1,4 @@
-import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,setCustomSound,slotInfo,SOUND_SLOTS,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,REG_FUN_BOOL3,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=3';
+import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,setCustomSound,setCustomKeySound,writeVerified,slotInfo,SOUND_SLOTS,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,REG_FUN_BOOL3,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=4';
 
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
@@ -65,7 +65,12 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     try{
       say(`Upload ${name} läuft …`);
       const r=await uploadSound(c,{slot:target,payload,mask:e?.mask||0,signal:uploading.signal,log,onProgress:(n,total)=>{$('snd-progress').value=n/total;say(`Upload ${name}: ${n}/${total} Pakete …`);}});
-      const test=e?.type==='customize_sound'?' Custom-Taste auf „Soundeffekt“ stellen und drücken.':e?.type==='power_on_sound'?' Zum Testen den Roller aus- und einschalten.':'';
+      let test=e?.type==='power_on_sound'?' Zum Testen den Roller aus- und einschalten.':'';
+      if(e?.type==='customize_sound'){
+        // The sound only plays if the button's action is "sound effect"; otherwise it keeps e.g. the hazard lights.
+        try{test=` ${await assignKey(c)} Zum Testen die Custom-Taste drücken.`;}
+        catch(err){test=` Custom-Taste nicht auf Soundeffekt gestellt: ${err.message}`;log(`Custom-Taste: ${err.message}`,'ERROR');}
+      }
       say(`Upload abgeschlossen: ${r.packets} Pakete, Prüfsumme vom Roller bestätigt${e?', eigener Sound aktiv':''}.${test}`);
     }catch(err){say(`Upload fehlgeschlagen: ${err.message}`);log(`Sound-Upload: ${err.message}`,'ERROR');}
     finally{uploading=null;$('snd-progress').hidden=true;}
@@ -80,20 +85,23 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     try{const v=await setCustomSound(getClient(),e.mask,on);showMode(v);log(`${e.label}: ${on?'eigener Sound':'Werkston'} (Register 0x1F = 0x${v.toString(16)}, Rücklesen bestätigt).`);say(`${e.label} spielt jetzt ${on?'den eigenen Sound':'den Werkston'}.`);}
     catch(err){say(`${e.label} nicht umgestellt: ${err.message}`);log(`Register 0x1F: ${err.message}`,'ERROR');}
   }));
-  async function readKey(c){const v=await c.read(VCU,REG_CUSTOM_KEY);$('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${v}${v===CUSTOM_KEY_SOUND?' (Soundeffekt)':''}`;return v;}
+  const keyName=v=>v===CUSTOM_KEY_SOUND?`${v} (Soundeffekt)`:String(v);
+  async function readKey(c){const v=await c.read(VCU,REG_CUSTOM_KEY);$('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${keyName(v)}`;return v;}
+  async function assignKey(c){
+    const {before,changed}=await setCustomKeySound(c);
+    $('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${keyName(CUSTOM_KEY_SOUND)}`;
+    if(!changed)return 'Custom-Taste spielt bereits den Soundeffekt.';
+    previousKey=before;log(`Custom-Taste: ${before} → ${CUSTOM_KEY_SOUND} (Soundeffekt), Rücklesen bestätigt.`);
+    return `Custom-Taste von Aktion ${before} auf Soundeffekt umgestellt (Zurücksetzen unter „Custom-Taste und Abspielen“).`;
+  }
   $('snd-key-read').addEventListener('click',()=>exclusive(async()=>{try{await readKey(getClient());}catch(e){say(e.message);}}));
   $('snd-key-set').addEventListener('click',()=>exclusive(async()=>{
-    const c=getClient();
-    try{
-      const before=await readKey(c);if(before===CUSTOM_KEY_SOUND){say('Custom-Taste spielt bereits den Soundeffekt.');return;}
-      await c.writeNoReply(VCU,REG_CUSTOM_KEY,CUSTOM_KEY_SOUND);const after=await readKey(c);
-      if(after!==CUSTOM_KEY_SOUND)throw new Error(`Rücklesen ergab ${after} statt ${CUSTOM_KEY_SOUND}.`);
-      previousKey=before;log(`Custom-Taste: ${before} → ${CUSTOM_KEY_SOUND} (Soundeffekt), Rücklesen bestätigt.`);say('Custom-Taste spielt jetzt den Soundeffekt.');
-    }catch(e){say(`Custom-Taste nicht geändert: ${e.message}`);log(`Custom-Taste: ${e.message}`,'ERROR');}
+    try{say(await assignKey(getClient()));}
+    catch(e){say(`Custom-Taste nicht geändert: ${e.message}`);log(`Custom-Taste: ${e.message}`,'ERROR');}
   }));
   $('snd-key-restore').addEventListener('click',()=>exclusive(async()=>{
     const c=getClient();
-    try{await c.writeNoReply(VCU,REG_CUSTOM_KEY,previousKey);const after=await readKey(c);if(after!==previousKey)throw new Error(`Rücklesen ergab ${after}.`);log(`Custom-Taste auf ${previousKey} zurückgesetzt.`);say('Custom-Taste zurückgesetzt.');previousKey=null;}
+    try{await writeVerified(c,REG_CUSTOM_KEY,previousKey);await readKey(c);log(`Custom-Taste auf ${previousKey} zurückgesetzt.`);say('Custom-Taste zurückgesetzt.');previousKey=null;}
     catch(e){say(`Zurücksetzen fehlgeschlagen: ${e.message}`);}
   }));
   $('snd-play').addEventListener('click',()=>exclusive(async()=>{

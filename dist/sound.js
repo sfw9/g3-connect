@@ -48,16 +48,26 @@ export function parseBegin(data){
 export function planChunks(length){const n=Math.ceil(length/CHUNK);return {count:n,lastLength:length-(n-1)*CHUNK};}
 
 const hex=bytes=>[...bytes].map(b=>b.toString(16).padStart(2,'0')).join(' ');
-/** Read-modify-write of rFunBool3 with read-back; other bits stay untouched. Returns the new register value. */
-export async function writeSoundBits(client,value){
-  await client.writeNoReply(VCU,REG_FUN_BOOL3,value);
-  const after=await client.read(VCU,REG_FUN_BOOL3);
-  if(after!==value)throw new Error(`Register 0x1F: Rücklesen ergab 0x${after.toString(16).padStart(4,'0')} statt 0x${value.toString(16).padStart(4,'0')}.`);
-  return after;
+const word=v=>'0x'+v.toString(16).padStart(4,'0');
+/** Write a VCU register and confirm by read-back; the scooter may need a moment before the new value reads back. */
+export async function writeVerified(client,index,value,{attempts=4,delay=100}={}){
+  await client.writeNoReply(VCU,index,value);
+  let after;
+  for(let i=0;i<attempts;i++){if(i)await sleep(delay);after=await client.read(VCU,index);if(after===value)return after;}
+  throw new Error(`Register 0x${index.toString(16).toUpperCase()}: Rücklesen ergab ${word(after)} statt ${word(value)}.`);
 }
+/** Read-modify-write of rFunBool3 with read-back; other bits stay untouched. Returns the new register value. */
+export const writeSoundBits=(client,value)=>writeVerified(client,REG_FUN_BOOL3,value);
 export async function setCustomSound(client,mask,enabled){
   const before=await client.read(VCU,REG_FUN_BOOL3),value=enabled?before|mask:before&~mask;
   return value===before?before:writeSoundBits(client,value);
+}
+/** Assign the custom button's action to "sound effect" (0x4A = 8, plays slot 71). Returns the previous action. */
+export async function setCustomKeySound(client){
+  const before=await client.read(VCU,REG_CUSTOM_KEY);
+  if(before===CUSTOM_KEY_SOUND)return {before,changed:false};
+  await writeVerified(client,REG_CUSTOM_KEY,CUSTOM_KEY_SOUND);
+  return {before,changed:true};
 }
 
 /**

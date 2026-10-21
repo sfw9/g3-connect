@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,setCustomSound,SOUND_SLOTS,slotInfo,CHUNK} from '../dist/sound.js';
+import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,setCustomSound,setCustomKeySound,writeVerified,SOUND_SLOTS,slotInfo,CHUNK} from '../dist/sound.js';
 
 const silence=()=>buildPayload(encodeWav(new Float32Array(8000)));
 const hex=a=>[...a].map(b=>b.toString(16).padStart(2,'0')).join(' ');
@@ -89,6 +89,16 @@ test('switch between custom sound and factory tone per event',async()=>{
  const s=scooter({bits:0x3000});
  assert.equal(await setCustomSound(s,0x2000,false),0x1000);assert.equal(await setCustomSound(s,0x4000,true),0x5000);
  assert.equal(await setCustomSound(s,0x4000,true),0x5000);assert.equal(s.log.filter(e=>e[0]==='write').length,2,'no write when already set');
+});
+
+test('custom button action is set to sound effect (0x4A = 8) and accepts a delayed read-back',async()=>{
+ const s=scooter();s.regs.set(0x4a,3);let stale=1;const read=s.read;
+ s.read=async(b,i)=>i===0x4a&&s.log.some(e=>e[0]==='write')&&stale-->0?3:read(b,i);
+ assert.deepEqual(await setCustomKeySound(s),{before:3,changed:true});
+ assert.deepEqual(s.log.filter(e=>e[0]==='write'),[['write',0x16,0x4a,8]]);assert.equal(s.regs.get(0x4a),8);
+ assert.deepEqual(await setCustomKeySound(s),{before:8,changed:false});assert.equal(s.log.filter(e=>e[0]==='write').length,1,'no write when already set');
+ const stuck={...scooter(),async read(){return 3;}};
+ await assert.rejects(writeVerified(stuck,0x4a,8,{delay:1}),/0x4A: Rücklesen ergab 0x0003 statt 0x0008/);
 });
 
 test('extended reply with protocol 1 resumes after the last stored packet',async()=>{
