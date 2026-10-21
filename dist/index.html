@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=26"></script>
+<script type="module" src="app.js?v=27"></script>
 </head>
 <body>
 <header class="topbar">
@@ -171,6 +171,26 @@
   </div>
   <progress id="snd-progress" max="1" value="0" hidden></progress>
   <p id="snd-status" class="hint" role="status" aria-live="polite">Audiodatei wählen.</p>
+  <details class="sub">
+   <summary>Alle Sounds abspielen</summary>
+   <div class="body stack">
+    <p class="hint">Spielt die Nummern nacheinander mit playSound (Register 0x77) ab. Es wird nichts hochgeladen und nichts anderes geschrieben. Nummern, bei denen etwas kommt, mit „Hier kam ein Ton“ markieren.</p>
+    <div class="form-grid">
+     <div class="field"><label for="snd-scan-from">Von</label><input id="snd-scan-from" inputmode="numeric" value="0" autocomplete="off"></div>
+     <div class="field"><label for="snd-scan-to">Bis</label><input id="snd-scan-to" inputmode="numeric" value="255" autocomplete="off"></div>
+     <div class="field span-2"><label for="snd-scan-pause">Pause zwischen Sounds <span class="opt">s</span></label><input id="snd-scan-pause" inputmode="decimal" value="3" autocomplete="off"></div>
+    </div>
+    <div class="scan-now"><span class="readout-label">Gerade gespielt</span><strong id="snd-scan-current">—</strong></div>
+    <div class="actions">
+     <button type="button" id="snd-scan-prev" class="btn" disabled>◀ Zurück</button>
+     <button type="button" id="snd-scan-start" class="btn primary" disabled>Abspielen starten</button>
+     <button type="button" id="snd-scan-next" class="btn" disabled>Weiter ▶</button>
+    </div>
+    <button type="button" id="snd-scan-hit" class="btn primary wide" disabled>Hier kam ein Ton</button>
+    <p id="snd-scan-status" class="hint" role="status" aria-live="polite"></p>
+    <p id="snd-scan-hits" class="hint">Noch keine Nummer markiert.</p>
+   </div>
+  </details>
   <details class="sub">
    <summary>Sounds vom Roller aufnehmen (Dumper)</summary>
    <div class="body stack">

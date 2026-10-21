@@ -7,6 +7,8 @@ const hex4=v=>'0x'+v.toString(16).padStart(4,'0');
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
   let payload=null,previewUrl=null,uploading=null,previousKey=null,source=null,dumping=null;const recordings=[];
+  // Player: plays playSound values one after another; numbers where something was heard can be marked.
+  let scanTimer=null,scanValue=null,lastPlayed=null;const hits=[];
   const say=t=>{$('snd-status').textContent=t;};
   const online=()=>!!getClient()?.authenticated;
   const manual=()=>$('snd-event').value==='other';
@@ -42,7 +44,7 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
       :`${e.user?`Eigener Slot „${e.label}“: `:''}Slot ${e.slot}. ${known?`Das ist ${known.label}; oben direkt auswählen setzt das passende Bit. `:'Unbekannter Slot: kann abgelehnt werden oder einen vorhandenen Sound überschreiben. '}${bit}`;
   }
   function update(){
-    const ready=online()&&writable()&&!isBusy();
+    const ready=online()&&writable()&&!isBusy()&&!scanTimer;
     $('snd-upload').disabled=!ready||!payload||slot()===null||(needsConfirm()&&!$('snd-confirm').checked);
     $('snd-dry').disabled=!payload||slot()===null;
     $('snd-cancel').hidden=!uploading;
@@ -50,7 +52,13 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     $('snd-mode-on').disabled=$('snd-mode-off').disabled=!ready||!event()?.mask;
     $('snd-play').disabled=!ready||slot()===null;
     $('snd-own-save').disabled=!manual()||!selected();
-    $('snd-dump-start').disabled=!online()||!writable()||(isBusy()&&!dumping);$('snd-dump-start').hidden=!!dumping;$('snd-dump-stop').hidden=!dumping;
+    if(scanTimer&&!online())stopScan('Abspielen abgebrochen: Verbindung getrennt.');
+    const scanReady=online()&&writable()&&!dumping;
+    $('snd-scan-start').disabled=!scanReady||(!scanTimer&&isBusy());
+    $('snd-scan-start').textContent=scanTimer?'Stoppen':'Abspielen starten';
+    $('snd-scan-prev').disabled=$('snd-scan-next').disabled=!scanReady||!!scanTimer||isBusy();
+    $('snd-scan-hit').disabled=lastPlayed===null;
+    $('snd-dump-start').disabled=!online()||!writable()||!!scanTimer||(isBusy()&&!dumping);$('snd-dump-start').hidden=!!dumping;$('snd-dump-stop').hidden=!dumping;
     $('snd-dump-zip').disabled=!recordings.length||!!dumping;
     $('snd-key-restore').disabled=!ready||previousKey===null;
     $('snd-lock').hidden=!online()||writable();
@@ -184,6 +192,41 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     const zip=makeZip(recordings.map(r=>({name:`g3-sound-${String(r.number).padStart(3,'0')}.wav`,data:wavOf(r)})));
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([zip],{type:'application/zip'}));a.download='g3-sounds.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);
   });
+  const sayScan=t=>{$('snd-scan-status').textContent=t;};
+  const num=(id,max,fallback)=>{const t=String($(id).value).trim().replace(',','.');const n=Number(t);return t!==''&&Number.isFinite(n)&&n>=0&&n<=max?n:fallback;};
+  const range=()=>{const a=Math.floor(num('snd-scan-from',255,0)),b=Math.floor(num('snd-scan-to',255,255));return a<=b?[a,b]:[b,a];};
+  async function play(value){
+    const c=getClient();if(!c?.authenticated)throw new Error('Verbindung getrennt.');
+    setBusy(true);try{await c.writeNoReply(VCU,REG_PLAY_SOUND,value);}finally{setBusy(false);}
+    lastPlayed=value;$('snd-scan-current').textContent=String(value);log(`Sound abspielen: playSound ${value}.`);
+  }
+  function stopScan(message){clearInterval(scanTimer);scanTimer=null;scanValue=null;if(message)sayScan(message);update();}
+  async function scanStep(){
+    if(scanValue===null)return;const [,to]=range();
+    if(scanValue>to){stopScan(`Fertig. ${hits.length?`Markiert: ${hits.join(', ')}.`:'Keine Nummer markiert.'}`);return;}
+    if(isBusy())return;
+    try{await play(scanValue);sayScan(`Nummer ${scanValue} gespielt.`);scanValue++;}
+    catch(e){stopScan(`Abspielen abgebrochen: ${e.message}`);}
+  }
+  async function stepTo(value){
+    const [from,to]=range();if(scanTimer)stopScan();const v=Math.min(to,Math.max(from,value));
+    try{await play(v);sayScan(`Nummer ${v} gespielt.`);}catch(e){sayScan(e.message);}update();
+  }
+  $('snd-scan-start').addEventListener('click',()=>{
+    if(scanTimer){stopScan('Gestoppt.');return;}
+    const [from,to]=range(),pause=Math.max(1,num('snd-scan-pause',60,3));
+    scanValue=from;log(`Sound abspielen: ${from}–${to}, alle ${pause} s.`);
+    scanTimer=setInterval(()=>void scanStep(),pause*1000);void scanStep();update();
+  });
+  $('snd-scan-next').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed+1));
+  $('snd-scan-prev').addEventListener('click',()=>void stepTo(lastPlayed===null?range()[0]:lastPlayed-1));
+  $('snd-scan-hit').addEventListener('click',()=>{
+    // While playing, the last value sent is the one just heard; playback continues.
+    if(lastPlayed===null)return;if(!hits.includes(lastPlayed))hits.push(lastPlayed);
+    hits.sort((a,b)=>a-b);$('snd-scan-hits').textContent=`Ton gehört bei: ${hits.join(', ')}.`;
+    log(`Sound abspielen: Ton bei Nummer ${lastPlayed} gehört.`);update();
+  });
+  window.addEventListener('pagehide',()=>clearInterval(scanTimer));
   renderUserSlots();describe();update();
   return {update};
 }

@@ -1,7 +1,7 @@
 import {Ninebot} from './ninebot.js?v=11';
 import {installNavigation} from './navigation-ui.js?v=12';
 import {installManualSender} from './manual.js?v=1';
-import {installSoundUI} from './sound-ui.js?v=7';
+import {installSoundUI} from './sound-ui.js?v=8';
 import {hex} from './crypto.js?v=10';
 const $=id=>document.getElementById(id);
 const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null,manual=null,sound=null;
