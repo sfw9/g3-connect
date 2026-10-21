@@ -1,9 +1,18 @@
-// Custom sound upload to the G3 VCU. Format and flow follow the static analysis of the official app's
-// Java file-transfer path (g3-sound-upload-analysis.md): 8 kHz / 16 bit / mono WAV with a 12-byte prefix,
+// Custom sound upload to the G3 VCU (sound-upload-analysis.md): 8 kHz / 16 bit / mono WAV with a 12-byte prefix,
 // announced with 0x76, sent in 128-byte chunks with 0x77 and closed with 0x78 (index 0, inverted byte sum).
-// Not hardware-confirmed. The G3 sound slot number is not known and must be supplied by the user.
+// Confirmed by a decrypted capture of the Segway app (three accepted uploads into slot 71, 32 packets per
+// group, 30 ms pause). The slot table is the Segway server's setting-info answer for a G3.
 export const VCU=0x16,CMD_BEGIN=0x76,CMD_WRITE=0x77,CMD_FINISH=0x78;
 export const REG_CUSTOM_KEY=0x4a,REG_VOICE_VOLUME=0x76,REG_PLAY_SOUND=0x77,CUSTOM_KEY_SOUND=8;
+// rFunBool3: one bit per event selects the custom sound. The Segway app clears it before the upload and sets it afterwards.
+export const REG_FUN_BOOL3=0x1f;
+// `confirmed`: upload into this slot seen in the capture. `factory`: built-in tone number, not an upload slot.
+export const SOUND_SLOTS=[
+  {type:'customize_sound',label:'Custom-Taste',slot:71,mask:0x1000,factory:8,confirmed:true},
+  {type:'abnormal_alarm_sound',label:'Alarmton',slot:72,mask:0x2000,factory:14,confirmed:false},
+  {type:'power_on_sound',label:'Einschaltton',slot:73,mask:0x4000,factory:31,confirmed:false},
+];
+export const slotInfo=slot=>SOUND_SLOTS.find(s=>s.slot===slot)||null;
 export const RATE=8000,CHUNK=128,MAX_SECONDS=4;
 export const STATUS={0:'OK',1:'Fehler',2:'Indexfehler',3:'Speichern fehlgeschlagen'};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -39,14 +48,42 @@ export function parseBegin(data){
 export function planChunks(length){const n=Math.ceil(length/CHUNK);return {count:n,lastLength:length-(n-1)*CHUNK};}
 
 const hex=bytes=>[...bytes].map(b=>b.toString(16).padStart(2,'0')).join(' ');
+/** Read-modify-write of rFunBool3 with read-back; other bits stay untouched. Returns the new register value. */
+export async function writeSoundBits(client,value){
+  await client.writeNoReply(VCU,REG_FUN_BOOL3,value);
+  const after=await client.read(VCU,REG_FUN_BOOL3);
+  if(after!==value)throw new Error(`Register 0x1F: Rücklesen ergab 0x${after.toString(16).padStart(4,'0')} statt 0x${value.toString(16).padStart(4,'0')}.`);
+  return after;
+}
+export async function setCustomSound(client,mask,enabled){
+  const before=await client.read(VCU,REG_FUN_BOOL3),value=enabled?before|mask:before&~mask;
+  return value===before?before:writeSoundBits(client,value);
+}
+
 /**
- * Upload `payload` into `slot`. `client` provides request/sendUnacknowledged/read as in ninebot.js.
+ * Upload `payload` into `slot`. `client` provides request/sendUnacknowledged/read/writeNoReply as in ninebot.js.
+ * With `mask`, the event's custom-sound bit in 0x1F is cleared during the transfer and set afterwards, as the
+ * Segway app does; after a failure the previous register value is restored.
  * Throws on any non-OK status; never guesses a resume position the protocol description does not define.
  */
-export async function uploadSound(client,{slot,payload,onProgress=()=>{},log=()=>{},signal=null,retries=5,timeouts={begin:3000,ack:10000,finish:10000}}){
+export async function uploadSound(client,{slot,payload,mask=0,onProgress=()=>{},log=()=>{},signal=null,retries=5,timeouts={begin:3000,ack:10000,finish:10000}}){
   if(!Number.isInteger(slot)||slot<0||slot>255)throw new Error('Slot muss eine ganze Zahl von 0 bis 255 sein.');
-  const check=()=>{if(signal?.aborted)throw new Error('Upload abgebrochen.');};
   if(await client.read(VCU,0x57)!==0)throw new Error('Upload nur im Stillstand.');
+  if(!mask)return transfer(client,{slot,payload,onProgress,log,signal,retries,timeouts});
+  const before=await client.read(VCU,REG_FUN_BOOL3);
+  if(before&mask){await writeSoundBits(client,before&~mask);log(`Sound-Upload: Register 0x1F 0x${before.toString(16)} → 0x${(before&~mask).toString(16)} (eigener Sound aus während der Übertragung).`);}
+  let result;
+  try{result=await transfer(client,{slot,payload,onProgress,log,signal,retries,timeouts});}
+  catch(e){
+    if(before&mask){try{await writeSoundBits(client,before);}catch(restore){log(`Sound-Upload: Register 0x1F nicht zurückgesetzt: ${restore.message}`,'ERROR');}}
+    throw e;
+  }
+  await writeSoundBits(client,before|mask);
+  log(`Sound-Upload: Register 0x1F = 0x${(before|mask).toString(16)}, eigener Sound für Slot ${slot} aktiv.`);
+  return result;
+}
+async function transfer(client,{slot,payload,onProgress,log,signal,retries,timeouts}){
+  const check=()=>{if(signal?.aborted)throw new Error('Upload abgebrochen.');};
   const sum=checksum(payload),{count}=planChunks(payload.length);
   log(`Sound-Upload: Slot ${slot}, ${payload.length} Bytes, ${count} Abschnitte, Prüfsumme 0x${sum.toString(16).padStart(8,'0')}.`);
   const begin=await client.request(VCU,CMD_BEGIN,slot,beginData(payload.length),CMD_BEGIN,null,timeouts.begin);
