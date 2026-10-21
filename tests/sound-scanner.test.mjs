@@ -20,7 +20,8 @@ test('sound scanner plays numbers one by one, marks a hit as slot and only ever 
  assert.equal(nodes.get('snd-upload').disabled,true,'no upload while scanning');
  t.mock.timers.tick(2000);await flush();
  nodes.get('snd-scan-hit').dispatchEvent(new Event('click'));
- assert.equal(nodes.get('snd-slot').value,'6','the number just heard becomes the slot');
+ assert.match(nodes.get('snd-scan-hits').textContent,/Belegt \(Ton gehört\): 6/,'a heard number is listed as occupied');
+ assert.equal(nodes.get('snd-slot').value,'','occupied numbers are never proposed as upload slot');
  for(let i=0;i<4;i++){t.mock.timers.tick(2000);await flush();}
  assert.deepEqual(writes.map(w=>w[2]),[5,6,7,8]);assert.ok(writes.every(w=>w[0]===0x16&&w[1]===0x77),'only playSound is written');
  assert.match(nodes.get('snd-status').textContent,/Scan beendet. Markiert: 6/);

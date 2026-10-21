@@ -1,4 +1,4 @@
-import {convertAudio,encodeWav,buildPayload,checksum,planChunks,uploadSound,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=1';
+import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=2';
 
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
@@ -43,6 +43,11 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     $('snd-scan-prev').disabled=$('snd-scan-next').disabled=!scanReady||!!scanTimer||isBusy();
     $('snd-scan-hit').disabled=lastPlayed===null;
   }
+  function useSamples(samples,label){
+    const wav=encodeWav(samples);payload=buildPayload(wav);
+    if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([wav],{type:'audio/wav'}));$('snd-preview').src=previewUrl;$('snd-preview').hidden=false;
+    $('snd-info').textContent=`${label} · 8 kHz, 16 Bit, Mono · ${payload.length.toLocaleString('de-DE')} Bytes · ${planChunks(payload.length).count} Pakete`;
+  }
   async function convert(){
     if(!source){payload=null;update();return;}
     say('Datei wird umgewandelt …');
@@ -50,15 +55,13 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
       const start=Math.max(0,Number(String($('snd-start').value).replace(',','.'))||0);
       const seconds=Math.min(MAX_SECONDS,Math.max(0.2,Number(String($('snd-seconds').value).replace(',','.'))||MAX_SECONDS));
       const {samples,seconds:len,sourceSeconds}=await convertAudio(source,{start,seconds,normalize:$('snd-normalize').checked});
-      const wav=encodeWav(samples);payload=buildPayload(wav);
-      if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([wav],{type:'audio/wav'}));$('snd-preview').src=previewUrl;$('snd-preview').hidden=false;
-      const {count}=planChunks(payload.length);
-      $('snd-info').textContent=`${len.toFixed(2).replace('.',',')} s von ${sourceSeconds.toFixed(1).replace('.',',')} s · 8 kHz, 16 Bit, Mono · ${payload.length.toLocaleString('de-DE')} Bytes · ${count} Pakete`;
+      useSamples(samples,`${len.toFixed(2).replace('.',',')} s von ${sourceSeconds.toFixed(1).replace('.',',')} s`);
       say('Bereit. Vorschau anhören, Slot eintragen und hochladen.');
     }catch(e){payload=null;$('snd-preview').hidden=true;say(e.message);}
     update();
   }
   async function exclusive(fn){if(isBusy())return;setBusy(true);try{return await fn();}finally{setBusy(false);update();}}
+  $('snd-tone').addEventListener('click',()=>{source=null;$('snd-file').value='';useSamples(testTone(),'Testton: drei aufsteigende Pieptöne, 1,5 s');say('Testton bereit. Für die Slot-Suche eine stille Nummer eintragen, hochladen und mit „Abspielen“ prüfen.');update();});
   $('snd-file').addEventListener('change',async()=>{const f=$('snd-file').files?.[0];source=f?await f.arrayBuffer():null;await convert();});
   for(const id of ['snd-start','snd-seconds','snd-normalize'])$(id).addEventListener('change',()=>void convert());
   for(const id of ['snd-slot','snd-confirm'])$(id).addEventListener('input',update),$(id).addEventListener('change',update);
@@ -110,8 +113,9 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   $('snd-scan-hit').addEventListener('click',()=>{
     // While scanning, the last value played is the one just heard; the scan keeps running for further hits.
     if(lastPlayed===null)return;if(!hits.includes(lastPlayed))hits.push(lastPlayed);
-    $('snd-scan-hits').textContent=`Markiert: ${hits.join(', ')}. Als Slot übernommen: ${lastPlayed}.`;
-    $('snd-slot').value=String(lastPlayed);log(`Sound-Scanner: Nummer ${lastPlayed} als eigener Sound markiert.`);update();
+    hits.sort((a,b)=>a-b);
+    $('snd-scan-hits').textContent=`Belegt (Ton gehört): ${hits.join(', ')}. Diese Nummern nicht überschreiben. Zum Prüfen eines eigenen Sounds die Nummer ins Slot-Feld übernehmen.`;
+    log(`Sound-Scanner: Ton bei Nummer ${lastPlayed} gehört.`);update();
   });
   window.addEventListener('pagehide',()=>clearInterval(scanTimer));
   update();

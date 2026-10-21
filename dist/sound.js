@@ -79,6 +79,13 @@ export async function uploadSound(client,{slot,payload,onProgress=()=>{},log=()=
   return {bytes:payload.length,packets:count,checksum:sum,flow};
 }
 
+/** Unmistakable test signal: three rising beeps (660, 880, 1100 Hz), 1.5 s at 8 kHz. */
+export function testTone(){
+  const out=new Float32Array(RATE*1.5),beep=0.3,gap=0.2;
+  [660,880,1100].forEach((f,k)=>{const start=Math.round(k*(beep+gap)*RATE),n=Math.round(beep*RATE);
+    for(let i=0;i<n;i++){const env=Math.min(1,i/80,(n-i)/80);out[start+i]=0.9*env*Math.sin(2*Math.PI*f*i/RATE);}});
+  return out;
+}
 /** Decode any browser-supported audio file and convert it to the upload format. */
 export async function convertAudio(arrayBuffer,{start=0,seconds=MAX_SECONDS,normalize=true}={}){
   const AC=globalThis.AudioContext||globalThis.webkitAudioContext;if(!AC)throw new Error('Audio-Umwandlung wird von diesem Browser nicht unterstützt.');

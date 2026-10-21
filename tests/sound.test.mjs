@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,CHUNK} from '../dist/sound.js';
+import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,CHUNK} from '../dist/sound.js';
 
 const silence=()=>buildPayload(encodeWav(new Float32Array(8000)));
 const hex=a=>[...a].map(b=>b.toString(16).padStart(2,'0')).join(' ');
@@ -80,4 +80,12 @@ test('cancel stops before the next chunk',async()=>{
  const c=new AbortController(),s=scooter();
  await assert.rejects(uploadSound(s,{slot:1,payload:silence(),signal:c.signal,onProgress:n=>{if(n===10)c.abort();},timeouts:quick}),/abgebrochen/);
  assert.equal(s.log.filter(e=>e[1]===0x77).length,10);assert.equal(s.log.some(e=>e[1]===0x78),false);
+});
+
+test('built-in test tone: 1.5 s, three beeps separated by silence, within range',()=>{
+ const t=testTone();assert.equal(t.length,12000);assert.ok(t.every(s=>Math.abs(s)<=0.9));
+ const energy=(a,b)=>t.slice(a*8000,b*8000).reduce((x,s)=>x+s*s,0);
+ for(const [a,b]of [[0.05,0.25],[0.55,0.75],[1.05,1.25]])assert.ok(energy(a,b)>100,'beep');
+ for(const [a,b]of [[0.32,0.48],[0.82,0.98]])assert.equal(energy(a,b),0,'gap');
+ assert.equal(buildPayload(encodeWav(t)).length,24056);
 });

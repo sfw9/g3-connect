@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css?v=11">
 <script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=22"></script>
 </head>
 <body>
 <header class="topbar">
@@ -136,6 +136,7 @@
    <label for="snd-file">Audiodatei <span class="opt">MP3, WAV, OGG, M4A …</span></label>
    <input id="snd-file" type="file" accept="audio/*">
   </div>
+  <button type="button" id="snd-tone" class="btn">Stattdessen Testton verwenden (3 Pieptöne)</button>
   <div class="form-grid">
    <div class="field"><label for="snd-start">Start <span class="opt">s</span></label><input id="snd-start" inputmode="decimal" value="0" autocomplete="off"></div>
    <div class="field"><label for="snd-seconds">Länge <span class="opt">s · max. 4</span></label><input id="snd-seconds" inputmode="decimal" value="4" autocomplete="off"></div>
@@ -158,7 +159,7 @@
   <details class="sub">
    <summary>Slot finden (Sound-Scanner)</summary>
    <div class="body stack">
-    <p class="hint">Spielt die Sound-Nummern nacheinander ab, nur Abspielen, nichts wird geschrieben. Vorher mit der Segway-App einen auffälligen eigenen Sound hochladen; sobald du ihn hörst, „Das war mein Sound“ tippen. Annahme: Abspiel-Nummer und Upload-Slot sind gleich nummeriert (nicht bestätigt).</p>
+    <p class="hint">Spielt die Sound-Nummern nacheinander ab, nur Abspielen, nichts wird geschrieben. <strong>Ohne Segway-App:</strong> bei jeder Nummer, bei der etwas zu hören ist, „Hier kam ein Ton“ tippen – das sind Werkstöne, diese Nummern nicht überschreiben. Dann eine stille Nummer daneben als Slot eintragen, den Testton hochladen und mit „Abspielen“ prüfen. Annahme: Abspiel-Nummer und Upload-Slot sind gleich nummeriert (nicht bestätigt).</p>
     <div class="form-grid">
      <div class="field"><label for="snd-scan-from">Von</label><input id="snd-scan-from" inputmode="numeric" value="0" autocomplete="off"></div>
      <div class="field"><label for="snd-scan-to">Bis</label><input id="snd-scan-to" inputmode="numeric" value="255" autocomplete="off"></div>
@@ -170,7 +171,7 @@
      <button type="button" id="snd-scan-start" class="btn primary" disabled>Scan starten</button>
      <button type="button" id="snd-scan-next" class="btn" disabled>Weiter ▶</button>
     </div>
-    <button type="button" id="snd-scan-hit" class="btn primary wide" disabled>Das war mein Sound</button>
+    <button type="button" id="snd-scan-hit" class="btn primary wide" disabled>Hier kam ein Ton</button>
     <p id="snd-scan-hits" class="hint">Noch keine Treffer markiert.</p>
    </div>
   </details>
