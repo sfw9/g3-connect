@@ -1,0 +1,27 @@
+# Publishes a GitHub release with the Android APK when a version tag (e.g. v1.0) is pushed.
+# Uses the APK committed in dist/; it is signed locally, the signing key is not part of CI.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check APK against its checksum
+        run: cd dist && sha256sum -c g3-connect.sha256
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes=.github/release-notes/$TAG.md
+          [ -f "$notes" ] || notes=/dev/null
+          gh release create "$TAG" dist/g3-connect.apk dist/g3-connect.sha256 \
+            --title "G3 Connect $TAG" --notes-file "$notes"
