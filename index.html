@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Ninebot MAX G3 und F3: Bluetooth verbinden, Beschleunigung und Reichweitenanzeige einstellen, Navigation aufs Display senden.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11171e" media="(prefers-color-scheme: dark)">
+<title>G3 Connect</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css?v=11">
+<script type="module" src="ui.js?v=1"></script>
+<script type="module" src="app.js?v=29"></script>
+</head>
+<body>
+<header class="topbar">
+ <div class="brand">
+  <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><g><circle cx="9.5" cy="21.5" r="2.5"/><circle cx="22.5" cy="21.5" r="2.5"/><path d="M9.5 21.5h8.5l3.2-12H24.5M21.2 9.5h-3"/></g></svg>
+  <div class="brand-text"><span class="brand-name">G3 Connect</span><span class="brand-sub">Ninebot G3 · F3</span></div>
+ </div>
+ <nav class="tabs" role="tablist" aria-label="Bereiche">
+  <button type="button" role="tab" id="tab-scooter" data-tab="scooter" aria-controls="panel-scooter" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M5.5 17.5h8l3-11H20M16.5 6.5h-3"/></svg><span>Roller</span></button>
+  <button type="button" role="tab" id="tab-navigation" data-tab="navigation" aria-controls="panel-navigation" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8z"/></svg><span>Navigation</span></button>
+  <button type="button" role="tab" id="tab-android" data-tab="android" aria-controls="panel-android" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><span>Android</span></button>
+  <button type="button" role="tab" id="tab-log" data-tab="log" aria-controls="panel-log" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2.5" y="3.5" width="19" height="17" rx="2.5"/></svg><span>Logger</span></button>
+ </nav>
+ <span id="connection-chip" class="chip offline">Offline</span>
+</header>
+
+<main>
+<!-- ───────────── Roller ───────────── -->
+<section id="panel-scooter" class="panel cols" role="tabpanel" aria-labelledby="tab-scooter" data-panel="scooter">
+
+ <article class="card hero span-rows">
+  <div class="device">
+   <div class="device-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M5.5 17.5h8l3-11H20M16.5 6.5h-3"/></svg></div>
+   <div class="device-text">
+    <h1 id="device-name">Kein Gerät</h1>
+    <p id="device-caption">Nicht verbunden</p>
+   </div>
+  </div>
+
+  <div id="status-box" role="status" aria-live="polite">
+   <strong id="status-title">Bereit</strong>
+   <span id="status-detail">Chrome/Edge mit Web Bluetooth über HTTPS oder localhost erforderlich.</span>
+  </div>
+
+  <div class="actions">
+   <button type="button" id="connect" class="btn primary lg">Verbinden</button>
+   <button type="button" id="cancel-pairing" class="btn danger lg" hidden>Abbrechen</button>
+  </div>
+  <div class="actions">
+   <button type="button" id="pair-again" class="btn ghost wide">Neu koppeln (Power-Taste)</button>
+  </div>
+  <p id="connection-hint" class="hint">Roller einschalten, Segway-App schließen. Nach BLE-/Firmware-Wechsel „Neu koppeln“ wählen und erst bei der Aufforderung die Power-Taste kurz drücken. Der bisherige Browser-Schlüssel wird erst nach bestätigter neuer Kopplung ersetzt.</p>
+
+  <details class="sub">
+   <summary>Verbindungseinstellungen</summary>
+   <div class="body stack">
+    <label class="check"><input id="remember-pairing" type="checkbox" checked> Kopplung in diesem Browser merken</label>
+    <label class="check"><input id="show-all-devices" type="checkbox"> Alle Bluetooth-Geräte in der Auswahl zeigen</label>
+    <p class="hint small">Für Roller, die nicht in der Auswahl erscheinen, z. B. F3 Pro D oder F3 D. Dann den Roller anhand seiner Seriennummer auswählen.</p>
+    <div class="field">
+     <label for="name-override">Bluetooth-Name, falls verkürzt <span class="opt">optional</span></label>
+     <input id="name-override" autocomplete="off" spellcheck="false" placeholder="z. B. 1CGBC2510C0000">
+    </div>
+    <div class="field">
+     <label for="pairing-key">Vorhandener Pairing-Schlüssel <span class="opt">optional · sonst selbst erzeugt</span></label>
+     <div class="inline">
+      <input id="pairing-key" type="password" maxlength="32" autocomplete="off" spellcheck="false" placeholder="32 Hex-Zeichen">
+      <button type="button" id="reveal-key" class="btn">Anzeigen</button>
+     </div>
+    </div>
+    <button type="button" id="save-key" class="btn" hidden>Pairing-Schlüssel sichern</button>
+    <p id="new-key-hint" class="callout ok" hidden>Der Roller hat den erzeugten Schlüssel angenommen. Sicherung privat aufbewahren.</p>
+   </div>
+  </details>
+ </article>
+
+ <article class="card" aria-labelledby="accel-title">
+  <header class="card-head">
+   <div>
+    <h2 id="accel-title">Beschleunigung</h2>
+    <p class="sub-title">Sportmodus</p>
+   </div>
+   <div class="readout"><span class="readout-label">Aktuell</span><span id="current-level">—</span></div>
+  </header>
+  <fieldset id="levels" class="segmented" disabled>
+   <legend class="sr-only">Beschleunigung im Sportmodus</legend>
+   <label class="lvl-1"><input type="radio" name="level" value="1"><span><i class="bars" aria-hidden="true"><b></b><b></b><b></b></i>Stufe 1</span></label>
+   <label class="lvl-2"><input type="radio" name="level" value="2"><span><i class="bars" aria-hidden="true"><b></b><b></b><b></b></i>Stufe 2</span></label>
+   <label class="lvl-3"><input type="radio" name="level" value="3"><span><i class="bars" aria-hidden="true"><b></b><b></b><b></b></i>Stufe 3</span></label>
+  </fieldset>
+  <p id="read-status" class="hint">Noch nicht ausgelesen.</p>
+  <div class="actions">
+   <button type="button" id="apply" class="btn primary" disabled>Übernehmen</button>
+   <button type="button" id="refresh" class="btn" disabled>Auslesen</button>
+  </div>
+  <p class="note">Werte 1–3: Community-Protokoll, am echten Roller nicht verifiziert. Änderbar nur am MAX G3; bei anderen Modellen (z. B. F3) nur Lesen. Übernehmen nur im Stillstand; der neue Wert wird zurückgelesen.</p>
+ </article>
+
+ <article class="card" aria-labelledby="display-title">
+  <header class="card-head">
+   <div>
+    <h2 id="display-title">Reichweitenanzeige</h2>
+    <p class="sub-title">Am Roller-Display</p>
+   </div>
+  </header>
+  <label class="switch"><input id="range-enabled" type="checkbox" role="switch" disabled><span class="track" aria-hidden="true"></span><span>Reichweite auf dem Roller-Display anzeigen</span></label>
+  <p id="range-state" class="hint" role="status" aria-live="polite">Noch nicht ausgelesen.</p>
+  <p id="range-capability" class="callout warn"></p>
+  <div class="actions">
+   <button type="button" id="apply-range" class="btn primary" disabled>Anzeige übernehmen</button>
+   <button type="button" id="read-range" class="btn" disabled>Anzeige auslesen</button>
+  </div>
+  <p class="note">Zuordnung aus der offiziellen G3-App-Konfiguration. Rücklesen bestätigt den gespeicherten Wert; die sichtbare Wirkung bitte am Roller prüfen. Auch bei ausgeblendetem Segway-Schalter bedienbar.</p>
+  <details class="sub">
+   <summary>Display-Diagnose</summary>
+   <div class="body">
+    <p class="hint">Erfasst Firmwareversionen und Display-Einstellungen zur Zuordnung. Liest ausschließlich; die Anzeige am Roller wird dabei nicht verändert. Das Ergebnis ist im JSON-Diagnose-Download enthalten.</p>
+    <button type="button" id="read-display-diagnostics" class="btn" disabled>Display-Diagnose lesen</button>
+    <pre id="display-diagnostic-output" class="code"></pre>
+   </div>
+  </details>
+ </article>
+ <article class="card" aria-labelledby="sound-title">
+  <header class="card-head">
+   <div><h2 id="sound-title">Eigene Sounds</h2><p class="sub-title">Custom-Taste, Alarmton und Einschaltton</p></div>
+   <span class="badge">experimentell</span>
+  </header>
+  <p id="snd-lock" class="callout warn" hidden>Nur am MAX G3 freigegeben.</p>
+  <p class="callout ok">Slots laut Segway-Server für den G3: <strong>Custom-Taste 71, Alarmton 72, Einschaltton 73</strong>. Format und Ablauf sind mit einem Mitschnitt der Segway-App bestätigt (drei angenommene Uploads in Slot 71). Für Slot 72 und 73 wurde noch kein Upload am Roller beobachtet. Einen Slot für den Ausschaltton meldet der Server nicht.</p>
+  <div class="field">
+   <label for="snd-file">Audiodatei <span class="opt">MP3, WAV, OGG, M4A …</span></label>
+   <input id="snd-file" type="file" accept="audio/*">
+  </div>
+  <button type="button" id="snd-tone" class="btn">Stattdessen Testton verwenden (3 Pieptöne)</button>
+  <div class="form-grid">
+   <div class="field"><label for="snd-start">Start <span class="opt">s</span></label><input id="snd-start" inputmode="decimal" value="0" autocomplete="off"></div>
+   <div class="field"><label for="snd-seconds">Länge <span class="opt">s · max. 4</span></label><input id="snd-seconds" inputmode="decimal" value="4" autocomplete="off"></div>
+  </div>
+  <label class="check"><input id="snd-normalize" type="checkbox" checked> Lautstärke angleichen</label>
+  <audio id="snd-preview" controls hidden></audio>
+  <p id="snd-info" class="hint small"></p>
+  <div class="field">
+   <label for="snd-event">Sound für</label>
+   <select id="snd-event">
+    <option value="71" selected>Custom-Taste (Slot 71)</option>
+    <option value="72">Alarmton (Slot 72)</option>
+    <option value="73">Einschaltton (Slot 73)</option>
+    <option value="other">Andere Slot-Nummer (Experten)</option>
+   </select>
+  </div>
+  <div id="snd-slot-field" class="stack" hidden>
+   <div class="form-grid">
+    <div class="field"><label for="snd-slot">Slot-Nummer <span class="opt">0–255</span></label><input id="snd-slot" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label for="snd-mask">Bit in 0x1F <span class="opt">optional, z. B. 0x8000</span></label><input id="snd-mask" autocomplete="off" spellcheck="false"></div>
+    <div class="field span-2"><label for="snd-own-name">Name <span class="opt">zum Speichern</span></label><input id="snd-own-name" autocomplete="off" placeholder="z. B. Ausschaltton?"></div>
+   </div>
+   <button type="button" id="snd-own-save" class="btn" disabled>Als eigenen Slot speichern</button>
+  </div>
+  <button type="button" id="snd-own-delete" class="btn" hidden>Eigenen Slot löschen</button>
+  <p id="snd-slot-info" class="hint small"></p>
+  <label id="snd-confirm-row" class="check" hidden><input id="snd-confirm" type="checkbox"> Ich weiß, dass dieser Slot am Roller noch nicht bestätigt ist.</label>
+  <div class="actions">
+   <button type="button" id="snd-dry" class="btn" disabled>Trockenlauf</button>
+   <button type="button" id="snd-upload" class="btn primary" disabled>Hochladen</button>
+   <button type="button" id="snd-cancel" class="btn danger" hidden>Abbrechen</button>
+  </div>
+  <progress id="snd-progress" max="1" value="0" hidden></progress>
+  <p id="snd-status" class="hint" role="status" aria-live="polite">Audiodatei wählen.</p>
+  <details class="sub">
+   <summary>Alle Sounds abspielen</summary>
+   <div class="body stack">
+    <p class="hint">Spielt die Nummern nacheinander mit playSound (Register 0x77) ab. Es wird nichts hochgeladen und nichts anderes geschrieben. Nummern, bei denen etwas kommt, mit „Hier kam ein Ton“ markieren.</p>
+    <div class="form-grid">
+     <div class="field"><label for="snd-scan-from">Von</label><input id="snd-scan-from" inputmode="numeric" value="0" autocomplete="off"></div>
+     <div class="field"><label for="snd-scan-to">Bis</label><input id="snd-scan-to" inputmode="numeric" value="255" autocomplete="off"></div>
+     <div class="field span-2"><label for="snd-scan-pause">Pause zwischen Sounds <span class="opt">s</span></label><input id="snd-scan-pause" inputmode="decimal" value="3" autocomplete="off"></div>
+    </div>
+    <div class="scan-now"><span class="readout-label">Gerade gespielt</span><strong id="snd-scan-current">—</strong></div>
+    <div class="actions">
+     <button type="button" id="snd-scan-prev" class="btn" disabled>◀ Zurück</button>
+     <button type="button" id="snd-scan-start" class="btn primary" disabled>Abspielen starten</button>
+     <button type="button" id="snd-scan-next" class="btn" disabled>Weiter ▶</button>
+    </div>
+    <button type="button" id="snd-scan-hit" class="btn primary wide" disabled>Hier kam ein Ton</button>
+    <p id="snd-scan-status" class="hint" role="status" aria-live="polite"></p>
+    <p id="snd-scan-hits" class="hint">Noch keine Nummer markiert.</p>
+   </div>
+  </details>
+  <details class="sub">
+   <summary>Sounds vom Roller aufnehmen (Dumper)</summary>
+   <div class="body stack">
+    <p class="hint">Ein Befehl, um Sounds digital vom Roller zu lesen, ist nicht bekannt. Der Dumper spielt deshalb jede Nummer mit playSound (Register 0x77) ab und nimmt sie über das Mikrofon des Handys auf. Es wird nichts hochgeladen und nichts anderes geschrieben. Handy nah an den Lautsprecher des Rollers, ruhige Umgebung.</p>
+    <div class="form-grid">
+     <div class="field"><label for="snd-dump-from">Von</label><input id="snd-dump-from" inputmode="numeric" value="0" autocomplete="off"></div>
+     <div class="field"><label for="snd-dump-to">Bis</label><input id="snd-dump-to" inputmode="numeric" value="80" autocomplete="off"></div>
+     <div class="field span-2"><label for="snd-dump-seconds">Aufnahme je Nummer <span class="opt">s</span></label><input id="snd-dump-seconds" inputmode="decimal" value="3" autocomplete="off"></div>
+    </div>
+    <label class="check"><input id="snd-dump-skip" type="checkbox" checked> Nummern ohne erkannten Ton nicht behalten</label>
+    <div class="actions">
+     <button type="button" id="snd-dump-start" class="btn primary" disabled>Aufnahme starten</button>
+     <button type="button" id="snd-dump-stop" class="btn danger" hidden>Stoppen</button>
+     <button type="button" id="snd-dump-zip" class="btn" disabled>Alle als ZIP</button>
+    </div>
+    <progress id="snd-dump-progress" max="1" value="0" hidden></progress>
+    <p id="snd-dump-status" class="hint" role="status" aria-live="polite">Noch nichts aufgenommen.</p>
+    <ul id="snd-dump-list" class="dump-list"></ul>
+   </div>
+  </details>
+  <details class="sub">
+   <summary>Eigener Sound oder Werkston</summary>
+   <div class="body stack">
+    <p class="hint">Pro Ereignis schaltet ein Bit in Register 0x1F zwischen eigenem Sound und Werkston um (Custom-Taste 0x1000, Alarm 0x2000, Einschalten 0x4000). Der Upload setzt das Bit danach automatisch, wie die Segway-App. Die anderen Bits bleiben unverändert.</p>
+    <p id="snd-mode-state" class="hint">Noch nicht gelesen.</p>
+    <div class="actions">
+     <button type="button" id="snd-mode-read" class="btn" disabled>Status lesen</button>
+     <button type="button" id="snd-mode-on" class="btn primary" disabled>Eigenen Sound verwenden</button>
+     <button type="button" id="snd-mode-off" class="btn" disabled>Werkston verwenden</button>
+    </div>
+   </div>
+  </details>
+  <details class="sub">
+   <summary>Custom-Taste belegen</summary>
+   <div class="body stack">
+    <p class="hint">Legt fest, was die Custom-Taste macht (Register 0x4A, mit Rücklesen). Mit „Eigenen Sound abspielen“ spielt sie den Sound aus Slot 71; ein Upload für die Custom-Taste stellt das automatisch ein.</p>
+    <div class="field">
+     <label for="snd-key-action">Aktion</label>
+     <select id="snd-key-action" disabled>
+      <option value="1">1 – Parkmodus ein/aus</option>
+      <option value="2">2 – Berganfahrhilfe ein/aus</option>
+      <option value="3">3 – Gehmodus ein/aus</option>
+      <option value="4">4 – Rekuperationsstufe wechseln</option>
+      <option value="5">5 – Ein-/Zweimotorbetrieb (nicht beim MAX G3)</option>
+      <option value="6">6 – Warnblinker</option>
+      <option value="7">7 – BOOST</option>
+      <option value="8" selected>8 – Eigenen Sound abspielen</option>
+     </select>
+    </div>
+    <p id="snd-key-state" class="hint">Belegung noch nicht gelesen.</p>
+    <div class="actions">
+     <button type="button" id="snd-key-read" class="btn" disabled>Belegung lesen</button>
+     <button type="button" id="snd-key-set" class="btn primary" disabled>Belegung schreiben</button>
+     <button type="button" id="snd-key-restore" class="btn" disabled>Zurücksetzen</button>
+    </div>
+    <button type="button" id="snd-play" class="btn" disabled>Slot-Nummer abspielen (playSound)</button>
+    <p class="note">„Abspielen“ schreibt die Slot-Nummer in das playSound-Register 0x77. Ob der Roller dort die Slot-Nummer erwartet, ist nicht bestätigt; sicherer Test ist die Custom-Taste.</p>
+   </div>
+  </details>
+ </article>
+</section>
+
+<!-- ───────────── Navigation ───────────── -->
+<section id="panel-navigation" class="panel cols" role="tabpanel" aria-labelledby="tab-navigation" data-panel="navigation" hidden>
+
+ <article class="card nav-live span-rows" aria-label="Aktuelle Navigation">
+  <div class="maneuver" data-dir="none">
+   <div class="maneuver-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path class="arr arr-straight" d="M12 20V4M6 10l6-6 6 6"/><path class="arr arr-left" d="M18 20v-7a4 4 0 0 0-4-4H5M9 5 5 9l4 4"/><path class="arr arr-right" d="M6 20v-7a4 4 0 0 1 4-4h9M15 5l4 4-4 4"/><path class="arr arr-uturn" d="M8 20V9a5 5 0 0 1 10 0v4M14 10l4 4 4-4"/><path class="arr arr-round" d="M12 21v-5M12 16a4 4 0 1 0-4-4M8 12V7M5 10l3-3 3 3"/><path class="arr arr-arrive" d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path class="arr arr-none" d="M3 11 21 3l-8 18-2-8z"/></svg>
+   </div>
+   <div class="maneuver-text">
+    <strong id="nav-instruction">Noch keine Route.</strong>
+    <span id="nav-road"></span>
+    <span id="nav-remaining"></span>
+   </div>
+  </div>
+  <svg id="nav-map" viewBox="0 0 480 240" role="img" aria-label="Schematischer Verlauf der geplanten Route. Grün: Start, Rot: Ziel, Blau: Standort." hidden>
+   <path id="nav-route-path" fill="none" stroke="#555" stroke-width="3"></path>
+   <circle id="nav-route-start" r="5" fill="green"></circle><circle id="nav-route-end" r="5" fill="#b00020"></circle><circle id="nav-route-position" r="5" fill="#1463bf"></circle>
+  </svg>
+  <p id="nav-status" class="hint" role="status" aria-live="polite">Standort erfassen und Ziel wählen.</p>
+  <div class="actions">
+   <button type="button" id="nav-phone" class="btn primary" disabled>Auf Handy starten</button>
+   <button type="button" id="nav-start" class="btn primary" disabled>Mit G3-Display starten</button>
+   <button type="button" id="nav-stop" class="btn danger" disabled>Navigation beenden</button>
+  </div>
+  <p class="hint small">Für GPS und Bluetooth den Browser im Vordergrund lassen. Die Display-Navigation wird erst nach einem sichtbaren Displaytest freigeschaltet.</p>
+ </article>
+
+ <article class="card" aria-labelledby="navigation-title">
+  <header class="card-head"><div><h2 id="navigation-title">Route planen</h2><p class="sub-title">Fahrradroute über OpenStreetMap</p></div></header>
+  <ol class="steps">
+   <li>
+    <h3>Standort</h3>
+    <div class="actions">
+     <button type="button" id="nav-location" class="btn">Standort erfassen</button>
+    </div>
+    <p id="nav-position" class="hint">Standort noch nicht erfasst.</p>
+   </li>
+   <li>
+    <h3><label for="nav-query">Ziel</label></h3>
+    <div class="inline">
+     <input id="nav-query" type="search" autocomplete="off" enterkeyhint="search" placeholder="Adresse oder Breite, Länge">
+     <button type="button" id="nav-find" class="btn">Ziel suchen</button>
+    </div>
+    <select id="nav-results" size="3" aria-label="Gefundene Ziele"></select>
+   </li>
+   <li>
+    <h3>Route</h3>
+    <div class="actions">
+     <button type="button" id="nav-plan" class="btn primary" disabled>Fahrradroute berechnen</button>
+    </div>
+    <p id="nav-route-summary" class="summary"></p>
+   </li>
+  </ol>
+ </article>
+
+ <article class="card">
+  <details class="sub flush">
+   <summary>G3-Display testen <span class="badge">experimentell</span></summary>
+   <div class="body stack">
+    <p class="hint">Das Startformat für Pfeilnavigation stammt aus der Hersteller-App. Die sichtbare Wirkung am G3 bleibt zu prüfen. Im Stillstand testen. Der Test sendet 15 Sekunden lang jede Sekunde einen Linkspfeil mit 100 m und endet danach. Dies ist keine echte Route. Ein Startton allein bestätigt keine Anzeige. Erst bei sichtbarem Test die Display-Navigation freischalten.</p>
+    <button type="button" id="nav-test" class="btn" disabled>Displaytest senden</button>
+    <label class="check"><input id="nav-verified" type="checkbox" disabled> Test am Display sichtbar: Linkspfeil mit 100 m</label>
+    <p class="note">Bei einem Timeout die Diagnose als JSON speichern. Es werden keine alternativen Startformate automatisch ausprobiert. <a href="navigation-analysis.md">Protokoll und Grenzen</a></p>
+   </div>
+  </details>
+ </article>
+
+ <article class="card" aria-labelledby="manual-title">
+  <details class="sub flush">
+   <summary><span id="manual-title">Testwerte senden</span> <span class="badge">experimentell</span></summary>
+   <div class="body stack">
+    <p class="hint">Beliebige Werte ans G3-Display schicken, auch ohne Route und ohne GPS. Start nur im Stillstand. Es werden ausschließlich Display-Pakete gesendet, keine Motor- oder Steuerungsregister.</p>
+    <div class="sweep">
+     <h3>Alle Richtungen testen</h3>
+     <p class="hint small">Zeigt jedes Symbol nacheinander. Als Straßenname steht Nummer und Bezeichnung, z. B. „3/11 RECHTS“, damit du am Display die Zuordnung siehst. Abbiegedistanz, Reststrecke und Restzeit kommen aus den Feldern unten.</p>
+     <div class="form-grid">
+      <div class="field"><label for="man-sweep-mode">Umfang</label><select id="man-sweep-mode"><option value="known">11 Richtungen</option><option value="codes">Codes 0–31</option></select></div>
+      <div class="field"><label for="man-sweep-seconds">Sekunden je Symbol</label><input id="man-sweep-seconds" inputmode="numeric" autocomplete="off"></div>
+     </div>
+     <button type="button" id="man-sweep" class="btn primary" disabled>Alle Richtungen testen</button>
+    </div>
+    <div class="form-grid">
+     <div class="field span-2"><label for="man-direction">Richtung</label><select id="man-direction">
+       <option value="9">Geradeaus · Symbol 9</option>
+       <option value="2">Links · Symbol 2</option>
+       <option value="3">Rechts · Symbol 3</option>
+       <option value="4">Leicht links · Symbol 4</option>
+       <option value="5">Leicht rechts · Symbol 5</option>
+       <option value="6">Scharf links · Symbol 6</option>
+       <option value="7">Scharf rechts · Symbol 7</option>
+       <option value="8">Wenden · Symbol 8</option>
+       <option value="11">Kreisverkehr rechts · Symbol 11</option>
+       <option value="12">Kreisverkehr links · Symbol 12</option>
+       <option value="15">Ziel erreicht · Symbol 15</option>
+       <option value="custom">Eigener Symbolcode …</option>
+      </select></div>
+     <div class="field span-2" id="man-icon-field" hidden><label for="man-icon">Symbolcode <span class="opt">0–65535</span></label><input id="man-icon" inputmode="numeric" autocomplete="off"></div>
+     <div class="field span-2"><label for="man-next-road">Nächste Straße <span class="opt">max. 39 Byte</span></label><input id="man-next-road" autocomplete="off" spellcheck="false"></div>
+     <div class="field span-2"><label for="man-current-road">Aktuelle Straße <span class="opt">optional</span></label><input id="man-current-road" autocomplete="off" spellcheck="false"></div>
+     <div class="field"><label for="man-step">Abbiegedistanz <span class="opt">m</span></label><input id="man-step" inputmode="numeric" autocomplete="off"></div>
+     <div class="field"><label for="man-remaining">Reststrecke <span class="opt">km</span></label><input id="man-remaining" inputmode="decimal" autocomplete="off"></div>
+     <div class="field"><label for="man-minutes">Restfahrzeit <span class="opt">min</span></label><input id="man-minutes" inputmode="decimal" autocomplete="off"></div>
+     <div class="field"><label for="man-total">Gesamtstrecke <span class="opt">km</span></label><input id="man-total" inputmode="decimal" autocomplete="off" placeholder="wie Reststrecke"></div>
+     <div class="field"><label for="man-duration">Sendedauer <span class="opt">s · 0 = bis Stopp</span></label><input id="man-duration" inputmode="numeric" autocomplete="off"></div>
+     <div class="field"><label for="man-approach">Annäherung <span class="opt">m pro Sekunde</span></label><input id="man-approach" inputmode="numeric" autocomplete="off"></div>
+    </div>
+    <label class="check"><input id="man-gps" type="checkbox"> GPS-Signal vorhanden melden</label>
+    <label class="check"><input id="man-countdown" type="checkbox"> Restfahrzeit herunterzählen</label>
+    <div class="actions wide-actions">
+     <button type="button" id="man-once" class="btn" disabled>Einmal senden</button>
+     <button type="button" id="man-repeat" class="btn primary" disabled>Dauersenden</button>
+     <button type="button" id="man-stop" class="btn danger" disabled>Stopp</button>
+    </div>
+    <p id="man-status" class="hint" role="status" aria-live="polite">Mit dem Roller verbinden, dann Werte senden.</p>
+    <p class="note">Während des Sendens kannst du Werte ändern und erneut auf „Dauersenden“ bzw. „Neue Werte senden“ tippen. „Annäherung“ verringert Abbiegedistanz und Reststrecke jede Sekunde, um eine Fahrt zu simulieren. Die Routen-Navigation ist währenddessen gesperrt.</p>
+   </div>
+  </details>
+ </article>
+
+ <p class="note span-all">Zielsuche sendet die Suchanfrage an OpenStreetMap Nominatim; die Routenberechnung sendet Start und Ziel an routing.openstreetmap.de. Laufende GPS-Positionen bleiben auf deinem Gerät. Fahrradroute: örtliche Freigaben prüfen. Keine automatische Neuberechnung. Daten © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap-Mitwirkende</a>.</p>
+</section>
+
+<!-- ───────────── Android ───────────── -->
+<section id="panel-android" class="panel cols" role="tabpanel" aria-labelledby="tab-android" data-panel="android" hidden>
+
+ <article class="card promo span-rows" aria-labelledby="android-title">
+  <span class="badge">Android-App 1.1</span>
+  <h2 id="android-title">Google Maps direkt am Roller</h2>
+  <p>Die native App koppelt selbst per Bluetooth und überträgt die Abbiegehinweise aus Google Maps im Hintergrund auf das G3-Display. Chrome kann geschlossen bleiben, kein Google-API-Schlüssel nötig.</p>
+  <a class="btn primary lg" href="g3-connect.apk?v=19" download>
+   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+   G3 Connect herunterladen
+  </a>
+  <p class="meta">APK · etwa 10 MB · Android 8 oder neuer</p>
+  <ol class="steps">
+   <li><h3>Installieren</h3><p>APK installieren und G3 Connect öffnen.</p></li>
+   <li><h3>Freigaben</h3><p>Benachrichtigungszugriff und Bluetooth erlauben. Roller suchen, verbinden und bei der Aufforderung die Power-Taste kurz drücken.</p></li>
+   <li><h3>Losfahren</h3><p>„Google Maps automatisch am G3 starten / beenden“ eingeschaltet lassen. In Google Maps eine Navigation starten – G3 Connect sendet die Hinweise direkt.</p></li>
+  </ol>
+  <p class="callout warn">Seit Version 1.0 neue Signatur: Eine ältere G3 Connect Beta / G3 Maps Bridge vorher deinstallieren und den Roller danach neu koppeln. Von 1.0 auf 1.1 ist ein normales Update.</p>
+  <div class="links">
+   <a href="g3-connect-android-source.zip" download>Quellcode und Lizenzen</a>
+   <a href="android-readme.md">Anleitung (englisch)</a>
+   <a href="g3-connect.sha256">SHA-256-Prüfsumme</a>
+  </div>
+ </article>
+
+ <article class="card" aria-labelledby="news-title">
+  <header class="card-head"><div><h2 id="news-title">Neuigkeiten</h2></div></header>
+  <ol class="timeline">
+   <li><span class="badge accent">1.1</span><p>„Pairing-Schlüssel anzeigen“: zeigt den beim Koppeln erzeugten Schlüssel zum Kopieren, z. B. für die Web-App. Auch die Web-App zeigt nach dem Verbinden jetzt den verwendeten Schlüssel unter „Verbindungseinstellungen“.</p></li>
+   <li><span class="badge">1.0</span><p>Eigene Sounds per Bluetooth: Audiodatei oder Testton für Custom-Taste, Alarmton oder Einschaltton hochladen, eigener Sound oder Werkston umschalten, Custom-Taste mit allen acht Aktionen belegen, alle Sounds nacheinander abspielen. Neue Signatur: alte Version vorher deinstallieren.</p></li>
+   <li><span class="badge">Vorher</span><p>Neu gestaltete Oberfläche, manuelles Senden ans Display, 1337-km-Platzhalter für fehlende Reststrecke, Erkennung von Start- und Abbiegeanweisungen aus Google Maps.</p></li>
+  </ol>
+ </article>
+
+ <article class="card" aria-labelledby="tips-title">
+  <header class="card-head"><div><h2 id="tips-title">Gut zu wissen</h2></div></header>
+  <ul class="ticks">
+   <li>Vor dem Losfahren verbinden und auf den ersten Pfeil warten.</li>
+   <li>Beschleunigung, Reichweitenanzeige, Displaytest und Logger sind auch in der Android-App enthalten.</li>
+   <li>Benachrichtigungszugriff unter Android 13+ gesperrt? In den App-Infos „Eingeschränkte Einstellungen zulassen“.</li>
+   <li>Eigene Sounds hochladen, Custom-Taste belegen und alle Sounds abspielen geht auch in der Android-App.</li>
+  </ul>
+ </article>
+</section>
+
+<!-- ───────────── Logger ───────────── -->
+<section id="panel-log" class="panel" role="tabpanel" aria-labelledby="tab-log" data-panel="log" hidden>
+ <article class="card" aria-labelledby="logger-title">
+  <header class="card-head">
+   <div><h2 id="logger-title">Logger <small id="log-count" class="count">0 Einträge</small></h2><p class="sub-title">Bluetooth, Authentifizierung und Navigation</p></div>
+  </header>
+  <div class="toolbar">
+   <button type="button" id="copy-log" class="btn">Kopieren</button>
+   <button type="button" id="download-log" class="btn">Als Text speichern</button>
+   <button type="button" id="download-json" class="btn">Diagnose als JSON</button>
+   <button type="button" id="clear-log" class="btn ghost danger-text">Leeren</button>
+  </div>
+  <textarea id="log" rows="23" readonly spellcheck="false" aria-label="Bluetooth- und Authentifizierungsprotokoll"></textarea>
+  <div class="log-foot">
+   <label class="check"><input id="auto-scroll" type="checkbox" checked> Automatisch scrollen</label>
+   <p id="log-feedback" role="status" aria-live="polite">Keine Schlüssel oder Nutzdaten im Log.</p>
+  </div>
+ </article>
+</section>
+
+<footer class="foot">Beschleunigungswerte 1–3: Community-Protokoll, am echten Roller nicht verifiziert. <a href="README.md">Dokumentation</a></footer>
+</main>
+</body>
+</html>

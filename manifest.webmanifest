@@ -1,0 +1,14 @@
+{
+  "name": "G3 Connect",
+  "short_name": "G3 Connect",
+  "description": "Ninebot MAX G3 per Bluetooth verbinden, Beschleunigung und Reichweitenanzeige einstellen, Navigation aufs Display senden.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f4f7",
+  "theme_color": "#0b7d73",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
