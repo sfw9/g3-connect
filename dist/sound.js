@@ -62,13 +62,20 @@ export async function setCustomSound(client,mask,enabled){
   const before=await client.read(VCU,REG_FUN_BOOL3),value=enabled?before|mask:before&~mask;
   return value===before?before:writeSoundBits(client,value);
 }
-/** Assign the custom button's action to "sound effect" (0x4A = 8, plays slot 71). Returns the previous action. */
-export async function setCustomKeySound(client){
+// Custom button actions from the G3 app configuration (0x4A, 16 bit LE). 0 is not defined; 5 needs a second motor.
+export const KEY_ACTIONS={1:'Parkmodus ein/aus',2:'Berganfahrhilfe ein/aus',3:'Gehmodus ein/aus',4:'Rekuperationsstufe wechseln',
+  5:'Ein-/Zweimotorbetrieb (nicht beim MAX G3)',6:'Warnblinker',7:'BOOST',8:'Eigenen Sound abspielen'};
+export const keyActionName=v=>KEY_ACTIONS[v]?`${v} – ${KEY_ACTIONS[v]}`:`${v} (unbekannt)`;
+/** Assign the custom button's action with read-back. Returns the previous action. */
+export async function setCustomKey(client,value){
+  if(!KEY_ACTIONS[value])throw new Error(`Unbekannte Tastenaktion ${value}.`);
   const before=await client.read(VCU,REG_CUSTOM_KEY);
-  if(before===CUSTOM_KEY_SOUND)return {before,changed:false};
-  await writeVerified(client,REG_CUSTOM_KEY,CUSTOM_KEY_SOUND);
+  if(before===value)return {before,changed:false};
+  await writeVerified(client,REG_CUSTOM_KEY,value);
   return {before,changed:true};
 }
+/** "Play custom sound" (8) plays slot 71. */
+export const setCustomKeySound=client=>setCustomKey(client,CUSTOM_KEY_SOUND);
 
 /**
  * Upload `payload` into `slot`. `client` provides request/sendUnacknowledged/read/writeNoReply as in ninebot.js.

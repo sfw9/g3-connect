@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,setCustomSound,setCustomKeySound,writeVerified,SOUND_SLOTS,slotInfo,CHUNK} from '../dist/sound.js';
+import {testTone,encodeWav,buildPayload,checksum,beginData,parseBegin,planChunks,uploadSound,setCustomSound,setCustomKey,setCustomKeySound,KEY_ACTIONS,keyActionName,writeVerified,SOUND_SLOTS,slotInfo,CHUNK} from '../dist/sound.js';
 
 const silence=()=>buildPayload(encodeWav(new Float32Array(8000)));
 const hex=a=>[...a].map(b=>b.toString(16).padStart(2,'0')).join(' ');
@@ -99,6 +99,13 @@ test('custom button action is set to sound effect (0x4A = 8) and accepts a delay
  assert.deepEqual(await setCustomKeySound(s),{before:8,changed:false});assert.equal(s.log.filter(e=>e[0]==='write').length,1,'no write when already set');
  const stuck={...scooter(),async read(){return 3;}};
  await assert.rejects(writeVerified(stuck,0x4a,8,{delay:1}),/0x4A: Rücklesen ergab 0x0003 statt 0x0008/);
+});
+
+test('all eight custom button actions from the G3 app configuration, nothing else is written',async()=>{
+ assert.deepEqual(Object.keys(KEY_ACTIONS).map(Number),[1,2,3,4,5,6,7,8]);
+ assert.equal(keyActionName(6),'6 – Warnblinker');assert.equal(keyActionName(0),'0 (unbekannt)');
+ for(const v of [1,2,3,4,5,6,7,8]){const s=scooter();s.regs.set(0x4a,v===1?2:1);await setCustomKey(s,v);assert.deepEqual(s.log.filter(e=>e[0]==='write'),[['write',0x16,0x4a,v]]);}
+ for(const v of [0,9,NaN])await assert.rejects(setCustomKey(scooter(),v),/Unbekannte Tastenaktion/);
 });
 
 test('extended reply with protocol 1 resumes after the last stored packet',async()=>{

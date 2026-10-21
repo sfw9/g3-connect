@@ -1,4 +1,4 @@
-import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,setCustomSound,setCustomKeySound,writeVerified,slotInfo,SOUND_SLOTS,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,REG_FUN_BOOL3,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=4';
+import {convertAudio,testTone,encodeWav,buildPayload,checksum,planChunks,uploadSound,setCustomSound,setCustomKey,setCustomKeySound,keyActionName,writeVerified,slotInfo,SOUND_SLOTS,VCU,REG_CUSTOM_KEY,REG_PLAY_SOUND,REG_FUN_BOOL3,CUSTOM_KEY_SOUND,MAX_SECONDS} from './sound.js?v=5';
 
 export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
   const $=id=>document.getElementById(id);
@@ -25,7 +25,7 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     $('snd-upload').disabled=!ready||!payload||slot()===null||(needsConfirm()&&!$('snd-confirm').checked);
     $('snd-dry').disabled=!payload||slot()===null;
     $('snd-cancel').hidden=!uploading;
-    for(const id of ['snd-key-read','snd-key-set','snd-mode-read'])$(id).disabled=!ready;
+    for(const id of ['snd-key-read','snd-key-set','snd-key-action','snd-mode-read'])$(id).disabled=!ready;
     $('snd-mode-on').disabled=$('snd-mode-off').disabled=!ready||!event();
     $('snd-play').disabled=!ready||slot()===null;
     $('snd-key-restore').disabled=!ready||previousKey===null;
@@ -85,18 +85,18 @@ export function installSoundUI({getClient,isBusy,setBusy,log,writable}){
     try{const v=await setCustomSound(getClient(),e.mask,on);showMode(v);log(`${e.label}: ${on?'eigener Sound':'Werkston'} (Register 0x1F = 0x${v.toString(16)}, Rücklesen bestätigt).`);say(`${e.label} spielt jetzt ${on?'den eigenen Sound':'den Werkston'}.`);}
     catch(err){say(`${e.label} nicht umgestellt: ${err.message}`);log(`Register 0x1F: ${err.message}`,'ERROR');}
   }));
-  const keyName=v=>v===CUSTOM_KEY_SOUND?`${v} (Soundeffekt)`:String(v);
-  async function readKey(c){const v=await c.read(VCU,REG_CUSTOM_KEY);$('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${keyName(v)}`;return v;}
-  async function assignKey(c){
-    const {before,changed}=await setCustomKeySound(c);
-    $('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${keyName(CUSTOM_KEY_SOUND)}`;
-    if(!changed)return 'Custom-Taste spielt bereits den Soundeffekt.';
-    previousKey=before;log(`Custom-Taste: ${before} → ${CUSTOM_KEY_SOUND} (Soundeffekt), Rücklesen bestätigt.`);
-    return `Custom-Taste von Aktion ${before} auf Soundeffekt umgestellt (Zurücksetzen unter „Custom-Taste und Abspielen“).`;
+  function showKey(v){$('snd-key-state').textContent=`Aktuelle Belegung der Custom-Taste: ${keyActionName(v)}`;if(v>=1&&v<=8)$('snd-key-action').value=String(v);}
+  async function readKey(c){const v=await c.read(VCU,REG_CUSTOM_KEY);showKey(v);return v;}
+  async function assignKey(c,value=CUSTOM_KEY_SOUND){
+    const {before,changed}=value===CUSTOM_KEY_SOUND?await setCustomKeySound(c):await setCustomKey(c,value);
+    showKey(value);
+    if(!changed)return `Custom-Taste ist bereits belegt mit ${keyActionName(value)}.`;
+    previousKey=before;log(`Custom-Taste: ${keyActionName(before)} → ${keyActionName(value)}, Rücklesen bestätigt.`);
+    return `Custom-Taste von ${keyActionName(before)} auf ${keyActionName(value)} umgestellt (Zurücksetzen unter „Custom-Taste belegen“).`;
   }
   $('snd-key-read').addEventListener('click',()=>exclusive(async()=>{try{await readKey(getClient());}catch(e){say(e.message);}}));
   $('snd-key-set').addEventListener('click',()=>exclusive(async()=>{
-    try{say(await assignKey(getClient()));}
+    try{say(await assignKey(getClient(),Number($('snd-key-action').value)));}
     catch(e){say(`Custom-Taste nicht geändert: ${e.message}`);log(`Custom-Taste: ${e.message}`,'ERROR');}
   }));
   $('snd-key-restore').addEventListener('click',()=>exclusive(async()=>{

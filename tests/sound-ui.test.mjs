@@ -34,8 +34,13 @@ test('event picker: slot 71 uploads without confirmation, 72/73 and manual slots
  regs.set(0x4a,5);writes.length=0;pick('71');
  nodes.get('snd-upload').dispatchEvent(new Event('click'));await new Promise(r=>setTimeout(r,50));await flush();
  assert.deepEqual(writes.filter(w=>w[1]===0x4a),[[0x16,0x4a,8]]);assert.equal(regs.get(0x1f)&0x1000,0x1000);
- assert.match(nodes.get('snd-status').textContent,/Upload abgeschlossen.*von Aktion 5 auf Soundeffekt umgestellt/);
+ assert.match(nodes.get('snd-status').textContent,/Upload abgeschlossen.*von 5 – Ein-\/Zweimotorbetrieb.* auf 8 – Eigenen Sound abspielen umgestellt/);
  assert.equal(nodes.get('snd-key-restore').disabled,false);
  nodes.get('snd-key-restore').dispatchEvent(new Event('click'));await flush();
  assert.equal(regs.get(0x4a),5);assert.match(nodes.get('snd-status').textContent,/zurückgesetzt/);
+ // Any of the eight actions can be chosen; reading selects the current one.
+ nodes.get('snd-key-action').value='6';nodes.get('snd-key-set').dispatchEvent(new Event('click'));await flush();
+ assert.deepEqual(writes.at(-1),[0x16,0x4a,6]);assert.match(nodes.get('snd-key-state').textContent,/6 – Warnblinker/);
+ regs.set(0x4a,3);nodes.get('snd-key-read').dispatchEvent(new Event('click'));await flush();
+ assert.equal(nodes.get('snd-key-action').value,'3');assert.match(nodes.get('snd-key-state').textContent,/3 – Gehmodus/);
 });
