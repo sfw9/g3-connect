@@ -1,0 +1,8 @@
+{
+  "appId": "de.g3connect.connect",
+  "appName": "G3 Connect",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

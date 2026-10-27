@@ -9,26 +9,31 @@ const pad = a => {const b = new Uint8Array(16); b.set(a.slice(0,16)); return b;}
 const xor = (a,b) => a.map((n,i) => n ^ b[i]);
 export const FW = unhex('97cfb802844143de56002b3b34780a5d');
 export class Encryption2 {
-  constructor(gen2=true) {this.staticInput=gen2?FW:new Uint8Array(16);this.auth=new Uint8Array(16);this.counter=0;this.lastRx=-1;this.sn=false;}
-  async setKey(first,second=new Uint8Array(16)) {
+  constructor(gen2=true) {this.staticInput=gen2?FW:new Uint8Array(16);this.auth=new Uint8Array(16);this.counter=0;this.lastRx=-1;this.sn=false;this.key=null;this.altKey=null;}
+  async importAes(first,second=new Uint8Array(16)) {
     const raw = new Uint8Array(await crypto.subtle.digest('SHA-1',bytes(pad(first),pad(second)))).slice(0,16);
-    this.key=await crypto.subtle.importKey('raw',raw,'AES-CBC',false,['encrypt']);
+    return crypto.subtle.importKey('raw',raw,'AES-CBC',false,['encrypt']);
   }
-  async block(input) {
+  async setKey(first,second=new Uint8Array(16)) {this.key=await this.importAes(first,second);}
+  // A second acceptable receive key. Set during a Power-button pairing so the vehicle's
+  // confirmation — MAC'd under the freshly set pairing key — still authenticates while we
+  // keep sending SET_KEY under the registration key. Cleared when pairing ends.
+  async setAltKey(first,second=new Uint8Array(16)) {this.altKey=await this.importAes(first,second);}
+  async block(input,key=this.key) {
     // First CBC block with zero IV is AES-ECB(input). Ignore WebCrypto's padding block.
-    return new Uint8Array(await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},this.key,input)).slice(0,16);
+    return new Uint8Array(await crypto.subtle.encrypt({name:'AES-CBC',iv:new Uint8Array(16)},key,input)).slice(0,16);
   }
   nonce(counter) {return bytes([counter>>>24,(counter>>>16)&255,(counter>>>8)&255,counter&255],this.auth.slice(0,8),[0]);}
-  async mac(plain,nonce) {
-    let x=await this.block(bytes([0x59],nonce,[0,plain.length-3]));
-    x=await this.block(xor(x,bytes(plain.slice(0,3),new Uint8Array(13))));
-    for(let i=3;i<plain.length;i+=16) x=await this.block(xor(x,pad(plain.slice(i,i+16))));
+  async mac(plain,nonce,key=this.key) {
+    let x=await this.block(bytes([0x59],nonce,[0,plain.length-3]),key);
+    x=await this.block(xor(x,bytes(plain.slice(0,3),new Uint8Array(13))),key);
+    for(let i=3;i<plain.length;i+=16) x=await this.block(xor(x,pad(plain.slice(i,i+16))),key);
     return x.slice(0,4);
   }
-  async cryptPayload(payload,nonce) {
+  async cryptPayload(payload,nonce,key=this.key) {
     let out=new Uint8Array(payload.length);
     for(let offset=0,idx=1;offset<payload.length;offset+=16,idx++) {
-      const stream=await this.block(nonce?bytes([1],nonce,[0,idx]):this.staticInput);
+      const stream=await this.block(nonce?bytes([1],nonce,[0,idx]):this.staticInput,key);
       out.set(xor(payload.slice(offset,offset+16),stream),offset);
     }
     return out;
@@ -53,13 +58,21 @@ export class Encryption2 {
       return bytes(raw.slice(0,3),p);
     }
     if(!this.sn || ctr<=this.lastRx) throw new Error('Wiederholter oder unerwarteter Frame.');
-    const nonce=this.nonce(ctr),plain=bytes(raw.slice(0,3),await this.cryptPayload(payload,nonce));
-    const tag=xor(await this.mac(plain,nonce),(await this.block(bytes([1],nonce,[0,0]))).slice(0,4));
-    let diff=0;tag.forEach((n,i)=>diff|=n^raw[raw.length-6+i]);
-    if(diff) throw new Error('Antwort konnte nicht authentifiziert werden.');
-    // Ninebot uses a chained counter shared by incoming and outgoing frames.
-    // The next TX must advance beyond the last verified vehicle counter.
-    this.lastRx=ctr;this.counter=Math.max(this.counter,ctr);return plain;
+    const nonce=this.nonce(ctr);
+    // Try the session key, then (during Power-button pairing) the freshly set pairing key:
+    // the vehicle MACs its confirmation under the key it just adopted. The outbound key is
+    // never touched here. A frame counts as authentic only under a key we derived ourselves.
+    for(const key of [this.key,this.altKey]) {
+      if(!key) continue;
+      const plain=bytes(raw.slice(0,3),await this.cryptPayload(payload,nonce,key));
+      const tag=xor(await this.mac(plain,nonce,key),(await this.block(bytes([1],nonce,[0,0]),key)).slice(0,4));
+      let diff=0;tag.forEach((n,i)=>diff|=n^raw[raw.length-6+i]);
+      if(diff) continue;
+      // Ninebot uses a chained counter shared by incoming and outgoing frames.
+      // The next TX must advance beyond the last verified vehicle counter.
+      this.lastRx=ctr;this.counter=Math.max(this.counter,ctr);return plain;
+    }
+    throw new Error('Antwort konnte nicht authentifiziert werden.');
   }
 }
 export function frame(board,cmd,index,payload=[],sync=0xa5) {

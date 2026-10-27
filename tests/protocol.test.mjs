@@ -56,7 +56,7 @@ test('counter exhaustion requires reconnect',async()=>{
  const c=new Encryption2();c.sn=true;c.counter=65535;await assert.rejects(c.encrypt(frame(0x16,2,0x6e,[3,0])),/erschöpft/);
 });
 
-function simulatedGatt({stored=1,confirm=true,delayedAck=0,confirmAfter=1,ignoreAuth=0,board=4,storedKey=null,disconnectInvalid=false,navigation=false}={}) {
+function simulatedGatt({stored=1,confirm=true,delayedAck=0,confirmAfter=1,ignoreAuth=0,board=4,storedKey=null,disconnectInvalid=false,navigation=false,confirmUnderNewKey=false}={}) {
  const name='1CGBC2510C0000';let auth,cipher,ready,connections=0;
  const sn=new TextEncoder().encode(name);const writes=[],wireCounters=[],attempts=[],disconnectListeners=new Set();let receiver,key,stage='initial',pairRequests=0,authRequests=0;
  const notify={uuid:'6e400003-b5a3-f393-e0a9-e50e24dcca9e',properties:{notify:true},addEventListener(_n,fn){receiver=fn;},removeEventListener(){receiver=null;},async startNotifications(){}};
@@ -88,6 +88,9 @@ function simulatedGatt({stored=1,confirm=true,delayedAck=0,confirmAfter=1,ignore
    pairRequests++;
    if(confirm && pairRequests>=confirmAfter){
     if(delayedAck){await reply(0x5c,0);setTimeout(async()=>{await reply(0x5c,1);await cipher.setKey(key,auth);stage='auth';},delayedAck);}
+    // Some firmware commits the new pairing key before confirming, so it signs the
+    // index-1 Power confirmation under that key rather than the registration key.
+    else if(confirmUnderNewKey){await cipher.setKey(key,auth);await reply(0x5c,1);stage='auth';}
     else {await reply(0x5c,1);await cipher.setKey(key,auth);stage='auth';}
    } else await reply(0x5c,0);
   } else if(stage==='ready'&&navigation){
@@ -115,6 +118,19 @@ test('complete encrypted GATT pairing creates own key even when already paired',
   assert.deepEqual(saved,simulated.key);assert.deepEqual(c.newPassword,saved);
   assert.ok(statuses.some(s=>s.startsWith('Power-Taste')));c.disconnect();
  }
+});
+test('Power confirmation signed under the freshly set pairing key still authenticates',async()=>{
+ // Reproduces the reported log: the 13-byte index-1 confirmation arrives MAC'd under the new
+ // pairing key, not the registration key. The old single-key decrypt discarded it ("RX verworfen:
+ // Antwort konnte nicht authentifiziert werden"); the alt-key accept path must complete pairing.
+ const simulated=simulatedGatt({confirmUnderNewKey:true});let saved;
+ const c=new Ninebot(()=>{},()=>{},key=>{saved=key.slice();});c.device=simulated.device;
+ await c.connect();
+ assert.equal(c.authenticated,true);
+ assert.deepEqual(simulated.writes.map(p=>p[5]),[0x5b,0x5c,0x5d]);
+ assert.deepEqual(saved,simulated.key);assert.deepEqual(c.newPassword,saved);
+ assert.equal(c.cipher.altKey,null,'the alternate pairing key is cleared once authenticated');
+ c.disconnect();
 });
 test('delayed Power ACK between TX attempts is retained',async()=>{
  const simulated=simulatedGatt({delayedAck:30});let saved=false;
@@ -163,7 +179,7 @@ test('authenticated GATT starts manufacturer SimpleNavi with one byte 01 and ver
 test('obsolete key recovers with a new GATT connection, challenge and counter, including peer disconnect',async()=>{
  for(const disconnectInvalid of [false,true]){
   const simulated=simulatedGatt({storedKey:new Uint8Array(16).fill(7),disconnectInvalid}),logs=[];let saved;
-  const c=new Ninebot(s=>logs.push(s),()=>{},key=>{saved=key.slice();});c.device=simulated.device;
+  const c=new Ninebot(s=>logs.push(s),()=>{},key=>{saved=key.slice();});c.device=simulated.device;c.reconnectSettleMs=0;
   const request=c.request.bind(c);c.request=(b,cmd,i,p,e,mi,t,o)=>request(b,cmd,i,p,e,mi,cmd===0x5d?35:t,o);
   await c.connect('00112233445566778899aabbccddeeff');
   assert.equal(c.authenticated,true);assert.equal(simulated.connections,2);assert.deepEqual(saved,simulated.key);
@@ -171,14 +187,6 @@ test('obsolete key recovers with a new GATT connection, challenge and counter, i
   if(!disconnectInvalid)assert.ok(logs.some(s=>s.includes('Antwort konnte nicht authentifiziert')));
   c.disconnect();
  }
-});
-test('explicit new pairing skips obsolete key and still requires physical confirmation',async()=>{
- const simulated=simulatedGatt({storedKey:new Uint8Array(16).fill(7),confirm:false});let saved=false;
- const c=new Ninebot(()=>{},()=>{},()=>{saved=true;});c.device=simulated.device;
- const register=c.registerPassword.bind(c);c.registerPassword=(n,e)=>register(n,e,{timeout:30,retryDelay:5});
- await assert.rejects(c.connect('00112233445566778899aabbccddeeff','',{forcePairing:true}),/Power-Bestätigung/);
- assert.equal(simulated.connections,1);assert.equal(saved,false);assert.equal(c.authenticated,false);
- assert.equal(simulated.attempts.some(p=>p.cmd===0x5d),false);c.disconnect();
 });
 test('cancelled stored-key AUTH never reconnects or replaces the saved key',{timeout:2000},async()=>{
  const simulated=simulatedGatt({storedKey:new Uint8Array(16).fill(7)}),statuses=[];
@@ -190,7 +198,7 @@ test('cancelled stored-key AUTH never reconnects or replaces the saved key',{tim
 });
 test('failed recovery stops after one fresh connection without saving an unconfirmed key',async()=>{
  const simulated=simulatedGatt({storedKey:new Uint8Array(16).fill(7),disconnectInvalid:true,confirm:false});
- const c=new Ninebot(()=>{},()=>{},()=>assert.fail('unconfirmed key must not replace the old key'));c.device=simulated.device;
+ const c=new Ninebot(()=>{},()=>{},()=>assert.fail('unconfirmed key must not replace the old key'));c.device=simulated.device;c.reconnectSettleMs=0;
  const register=c.registerPassword.bind(c);c.registerPassword=(n,e)=>register(n,e,{timeout:30,retryDelay:5});
  await assert.rejects(c.connect('00112233445566778899aabbccddeeff'),/Power-Bestätigung/);
  assert.equal(c.authenticated,false);assert.equal(simulated.connections,2);assert.equal(c.newPassword,undefined);

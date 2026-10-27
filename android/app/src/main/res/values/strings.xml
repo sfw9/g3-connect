@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">G3 Connect</string>
+    <string name="title_activity_main">G3 Connect</string>
+    <string name="package_name">de.g3connect.connect</string>
+    <string name="custom_url_scheme">de.g3connect.connect</string>
+</resources>

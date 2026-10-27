@@ -1,0 +1,38 @@
+{
+  "evidence": {
+    "harSha256": "3aefb5481fa20da8dc528b8dbe26c057e2d25fd7123daa4ee44cbda16290777e",
+    "javascriptSha256": "de13fbb878877d5efc39217b9f5d7635174a5130b8d9d2678ed5d592622f9575",
+    "harDeviceConfigMessage": 95,
+    "harSequenceMessages": [55, 75]
+  },
+  "g3InputMap": {
+    "1": "input.brake_left",
+    "2": "input.brake_right",
+    "4": "input.next_button",
+    "5": "input.prev_button",
+    "6": "input.left_button",
+    "7": "input.right_button",
+    "8": "input.custom_button"
+  },
+  "deviceConfig": {
+    "speed": {
+      "normal": { "sport": 22, "race": 22 },
+      "tuned": { "sport": 45, "race": 0 }
+    },
+    "speed_limits": {
+      "normal": { "sport": 22, "race": 22 },
+      "tuned": { "sport": 45, "race": 0 }
+    },
+    "underglow_lights": { "normal": false, "tuned": true },
+    "front_light_bar": { "normal": false, "tuned": true },
+    "cruise_control": { "normal": false, "tuned": true },
+    "panic_button": true,
+    "beep_on_profile_switch": true
+  },
+  "observedSequences": [
+    [2, 1, 2, 1, 1, 6, 7],
+    [2, 1, 2, 1, 1, 6, 4]
+  ],
+  "clientValidation": { "minimumEvents": 3, "maximumEvents": 20 },
+  "note": "Sanitized: no license key, device identity, serial number, pairing material, or encrypted transport bytes."
+}

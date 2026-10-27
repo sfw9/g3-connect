@@ -2,38 +2,48 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Ninebot MAX G3 und F3: Bluetooth verbinden, Beschleunigung und Reichweitenanzeige einstellen, Navigation aufs Display senden.">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#11171e" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#151516" id="meta-theme-color">
 <title>G3 Connect</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=11">
-<script type="module" src="ui.js?v=1"></script>
-<script type="module" src="app.js?v=29"></script>
+<link rel="stylesheet" href="style.css?v=19">
+<script>/* Apply the saved theme before first paint to avoid a flash. Default: Dark. */try{document.documentElement.dataset.theme=localStorage.getItem('g3-theme')||'dark';}catch(e){document.documentElement.dataset.theme='dark';}</script>
+<script type="module" src="ui.js?v=7"></script>
+<script type="module" src="app.js?v=31"></script>
 </head>
 <body>
 <header class="topbar">
  <div class="brand">
-  <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><g><circle cx="9.5" cy="21.5" r="2.5"/><circle cx="22.5" cy="21.5" r="2.5"/><path d="M9.5 21.5h8.5l3.2-12H24.5M21.2 9.5h-3"/></g></svg>
   <div class="brand-text"><span class="brand-name">G3 Connect</span><span class="brand-sub">Ninebot G3 · F3</span></div>
  </div>
  <nav class="tabs" role="tablist" aria-label="Bereiche">
   <button type="button" role="tab" id="tab-scooter" data-tab="scooter" aria-controls="panel-scooter" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M5.5 17.5h8l3-11H20M16.5 6.5h-3"/></svg><span>Roller</span></button>
+  <button type="button" role="tab" id="tab-profiles" data-tab="profiles" aria-controls="panel-profiles" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6"/></svg><span>Profile</span></button>
   <button type="button" role="tab" id="tab-navigation" data-tab="navigation" aria-controls="panel-navigation" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8z"/></svg><span>Navigation</span></button>
   <button type="button" role="tab" id="tab-android" data-tab="android" aria-controls="panel-android" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><span>Android</span></button>
   <button type="button" role="tab" id="tab-log" data-tab="log" aria-controls="panel-log" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2.5" y="3.5" width="19" height="17" rx="2.5"/></svg><span>Logger</span></button>
  </nav>
- <span id="connection-chip" class="chip offline">Offline</span>
+ <div class="header-end">
+  <select id="theme-select" class="theme-select" aria-label="Design">
+   <option value="dark">Dunkel</option>
+   <option value="og">OG (Blau)</option>
+   <option value="system">System</option>
+  </select>
+  <span id="connection-chip" class="chip offline">Offline</span>
+ </div>
 </header>
 
 <main>
 <!-- ───────────── Roller ───────────── -->
 <section id="panel-scooter" class="panel cols" role="tabpanel" aria-labelledby="tab-scooter" data-panel="scooter">
 
- <article class="card hero span-rows">
+ <article class="card hero span-all">
   <div class="device">
    <div class="device-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M5.5 17.5h8l3-11H20M16.5 6.5h-3"/></svg></div>
    <div class="device-text">
@@ -51,10 +61,7 @@
    <button type="button" id="connect" class="btn primary lg">Verbinden</button>
    <button type="button" id="cancel-pairing" class="btn danger lg" hidden>Abbrechen</button>
   </div>
-  <div class="actions">
-   <button type="button" id="pair-again" class="btn ghost wide">Neu koppeln (Power-Taste)</button>
-  </div>
-  <p id="connection-hint" class="hint">Roller einschalten, Segway-App schließen. Nach BLE-/Firmware-Wechsel „Neu koppeln“ wählen und erst bei der Aufforderung die Power-Taste kurz drücken. Der bisherige Browser-Schlüssel wird erst nach bestätigter neuer Kopplung ersetzt.</p>
+  <p id="connection-hint" class="hint">Roller einschalten, Segway-App schließen, auf „Verbinden“ tippen. Hat sich der Schlüssel am Roller geändert (nach BLE-/Firmware-Wechsel), merkt die App das selbst und stellt automatisch auf eine neue Power-Kopplung um – dann bei der Aufforderung die Power-Taste kurz drücken. Der bisherige Browser-Schlüssel wird erst nach bestätigter neuer Kopplung ersetzt.</p>
 
   <details class="sub">
    <summary>Verbindungseinstellungen</summary>
@@ -122,6 +129,15 @@
     <p class="hint">Erfasst Firmwareversionen und Display-Einstellungen zur Zuordnung. Liest ausschließlich; die Anzeige am Roller wird dabei nicht verändert. Das Ergebnis ist im JSON-Diagnose-Download enthalten.</p>
     <button type="button" id="read-display-diagnostics" class="btn" disabled>Display-Diagnose lesen</button>
     <pre id="display-diagnostic-output" class="code"></pre>
+   </div>
+  </details>
+  <details class="sub">
+   <summary>VCU-Schlüssel auslesen (Key-Dumper)</summary>
+   <div class="body">
+    <p class="hint">Nur mit geflashter Key-Dumper-Firmware: liest den 16-Byte-VCU-Schlüssel aus den Registern 32–39 (Board 0x16, Slot 0x20003182). Auf Standard-Firmware enthalten diese Register andere Daten. Der Schlüssel erscheint nur hier und im Download, nicht im Log.</p>
+    <button type="button" id="read-vcu-key" class="btn" disabled>VCU-Schlüssel lesen</button>
+    <button type="button" id="download-vcu-key" class="btn" hidden>Schlüssel herunterladen</button>
+    <pre id="vcu-key-output" class="code"></pre>
    </div>
   </details>
  </article>
@@ -254,6 +270,59 @@
 </section>
 
 <!-- ───────────── Navigation ───────────── -->
+<section id="panel-profiles" class="panel profiles-panel" role="tabpanel" aria-labelledby="tab-profiles" data-panel="profiles" hidden>
+ <article class="card">
+  <header class="card-head"><div><h1>CFW-Profile</h1><p class="sub-title">Lizenzcode / 1.6.2-Port · rekonstruierte AA03-Schnittstelle</p></div><span class="badge">VCU 0x16</span></header>
+  <p class="hint">Wie gewohnt im Tab „Roller“ verbinden. Hier zuerst beide Profilblöcke auslesen. Auf Standard-Firmware bleiben Schreibfunktionen gesperrt.</p>
+  <div class="profiles-summary"><p>Gemeldete Version <strong id="profiles-version">—</strong></p><p>Aktives Profil <strong id="profiles-active">—</strong></p></div>
+  <div class="actions"><button type="button" id="profiles-read" class="btn primary" disabled>Profile auslesen</button><button type="button" id="profiles-export" class="btn" disabled>Gelesene Werte sichern</button></div>
+  <p id="profiles-status" class="callout" role="status" aria-live="polite">Noch nicht ausgelesen. Keine Profilbefehle gesendet.</p>
+ </article>
+ <article class="card">
+  <fieldset id="profiles-fields" class="profiles-fields" disabled>
+   <legend>Profilkonfiguration</legend>
+   <div class="profiles-pair">
+    <fieldset class="profiles-box"><legend>Normalprofil</legend>
+     <div class="form-grid"><div class="field"><label for="profiles-normal-high">Sport-Limit (km/h)</label><input id="profiles-normal-high" type="number" min="15" max="255" step="1" inputmode="numeric"></div></div>
+     <label class="check"><input id="profiles-normal-flag4" type="checkbox"> Unterbodenbeleuchtung</label>
+     <label class="check"><input id="profiles-normal-flag800" type="checkbox"> Frontlichtleiste</label>
+     <label class="check"><input id="profiles-normal-cruise" type="checkbox"> Tempomat</label>
+    </fieldset>
+    <fieldset class="profiles-box"><legend>Alternativprofil</legend>
+     <div class="form-grid"><div class="field"><label for="profiles-alternate-high">Sport-Limit (km/h)</label><input id="profiles-alternate-high" type="number" min="15" max="255" step="1" inputmode="numeric"></div></div>
+     <label class="check"><input id="profiles-alternate-flag4" type="checkbox"> Unterbodenbeleuchtung</label>
+     <label class="check"><input id="profiles-alternate-flag800" type="checkbox"> Frontlichtleiste</label>
+     <label class="check"><input id="profiles-alternate-cruise" type="checkbox"> Tempomat</label>
+    </fieldset>
+   </div>
+   <p id="profiles-limits" class="hint">Die laufend aktualisierten Sport-Obergrenzen der VCU werden nur gelesen.</p>
+   <p class="note">Die Bezeichnungen und km/h-Einheit stammen aus dem originalen 1dragon-Client. Der G3 kennt keinen Race-Modus: Byte 0 (Race) wird nur gelesen und unverändert zurückgeschrieben, Byte 1 ist das einstellbare Sport-Limit (mindestens 15 km/h). Die Port-Firmware vergleicht und begrenzt beide Werte byteweise.</p>
+   <div class="seq-builder">
+    <div class="seq-head"><label id="profiles-sequence-label">Eingabefolge zum Alternativprofil</label><span id="profiles-sequence-count" class="seq-count">0/19</span></div>
+    <div id="profiles-sequence-chips" class="seq-chips" role="list" aria-live="polite" aria-labelledby="profiles-sequence-label profiles-sequence-help"></div>
+    <div class="seq-pad" role="group" aria-label="Bedienelement anhängen">
+     <button type="button" id="profiles-seq-add-1" class="btn seq-key">Left Brake</button>
+     <button type="button" id="profiles-seq-add-2" class="btn seq-key">Right Brake</button>
+     <button type="button" id="profiles-seq-add-4" class="btn seq-key">M button (up)</button>
+     <button type="button" id="profiles-seq-add-5" class="btn seq-key">Power button (down)</button>
+     <button type="button" id="profiles-seq-add-6" class="btn seq-key">Left blinker</button>
+     <button type="button" id="profiles-seq-add-7" class="btn seq-key">Right blinker</button>
+     <button type="button" id="profiles-seq-add-8" class="btn seq-key">Boost/Custom button</button>
+    </div>
+    <div class="seq-tools"><button type="button" id="profiles-seq-undo" class="btn ghost small">Letztes entfernen</button><button type="button" id="profiles-seq-clear" class="btn ghost small">Leeren</button></div>
+    <input type="hidden" id="profiles-sequence">
+   </div>
+   <p id="profiles-sequence-help" class="hint">Tippe die Bedienelemente in der Reihenfolge an, in der du sie am Roller betätigst (3–19 Schritte). Die Namen entsprechen exakt dem originalen 1dragon-Dashboard. Ein Schritt lässt sich über das „✕“ am Chip wieder entfernen. Die App ergänzt automatisch das Endezeichen. Standard: fünfmal „Left Brake“, dann fünfmal „Right Brake“.</p>
+   <details class="sub"><summary>Bedienelemente und Protokoll-IDs</summary><div class="body"><pre id="profiles-events" class="code"></pre><p class="note">Zuordnung aus dem originalen G3-Client (LC-Dashboard, g3InputMap).</p></div></details>
+   <label class="check"><input id="profiles-return" type="checkbox"> Panic Button: Boost/Custom bringt das Tuningprofil zurück zum Normalprofil</label>
+   <label class="check"><input id="profiles-beep" type="checkbox"> Ton beim Wechsel ins Alternativprofil</label>
+  </fieldset>
+  <div class="actions"><button type="button" id="profiles-save" class="btn primary" disabled>Schreiben + prüfen</button><button type="button" id="profiles-defaults" class="btn" disabled>Standard ins Formular</button></div>
+  <p class="note">Nur im Stillstand. F2 schreibt die beiden Blöcke einzeln; es gibt keine atomare Gesamtänderung. Rücklesen bestätigt RAM, nicht die Dauerhaftigkeit nach Stromverlust. Nach einem normalen Neustart erneut auslesen. Hier gibt es keinen Fernbefehl zur direkten Profilumschaltung.</p>
+ </article>
+ <article class="card"><details><summary>Protokoll und Rohwerte</summary><div class="body stack"><p>F1 → F4 liest Block 0 (20 Byte) oder Block 1 (16 Byte). F2 → F5 schreibt; anschließend wird mit F1 geprüft. Bluetooth-Pairing und Encryption2 bleiben unverändert.</p><pre id="profiles-raw" class="code"></pre><a href="profiles-protocol.md">Rekonstruierte Felder und Nachweise</a></div></details></article>
+</section>
+
 <section id="panel-navigation" class="panel cols" role="tabpanel" aria-labelledby="tab-navigation" data-panel="navigation" hidden>
 
  <article class="card nav-live span-rows" aria-label="Aktuelle Navigation">
@@ -442,5 +511,36 @@
 
 <footer class="foot">Beschleunigungswerte 1–3: Community-Protokoll, am echten Roller nicht verifiziert. <a href="README.md">Dokumentation</a></footer>
 </main>
+
+<!-- Eigener Freischalt-Dialog für den Profile-Tab (statt des schlichten window.prompt). -->
+<dialog id="unlock-dialog" class="modal" aria-labelledby="unlock-title">
+ <form id="unlock-form" class="modal-card" novalidate>
+  <div class="modal-lock" aria-hidden="true">🔒</div>
+  <h2 id="unlock-title" class="modal-title">Profile gesperrt</h2>
+  <p class="modal-text">Zum Freischalten den Zugangscode eingeben.</p>
+  <input id="unlock-input" class="modal-input" type="password" inputmode="numeric"
+         autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go"
+         placeholder="Code" aria-label="Zugangscode">
+  <p id="unlock-error" class="modal-error" role="alert" hidden>Falscher Code.</p>
+  <div class="modal-actions">
+   <button type="button" id="unlock-cancel" class="btn ghost">Abbrechen</button>
+   <button type="submit" id="unlock-submit" class="btn primary">Freischalten</button>
+  </div>
+ </form>
+</dialog>
+
+<!-- Eigene Gerätesuche für Android (ersetzt den schlichten nativen Gerätewähler des Plugins). -->
+<dialog id="scan-dialog" class="modal" aria-labelledby="scan-title">
+ <div class="modal-card">
+  <div class="modal-lock scan-spin" aria-hidden="true">📡</div>
+  <h2 id="scan-title" class="modal-title">Roller suchen</h2>
+  <p id="scan-text" class="modal-text">Suche nach Geräten in der Nähe …</p>
+  <ul id="scan-list" class="scan-list" aria-label="Gefundene Geräte"></ul>
+  <p id="scan-empty" class="modal-text scan-empty">Noch nichts gefunden. Roller einschalten und nah ans Handy halten.</p>
+  <div class="modal-actions">
+   <button type="button" id="scan-cancel" class="btn ghost wide">Abbrechen</button>
+  </div>
+ </div>
+</dialog>
 </body>
 </html>

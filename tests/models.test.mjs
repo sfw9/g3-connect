@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Ninebot,NORDIC,CUSTOM} from '../dist/ninebot.js?v=11';
+import {Ninebot,NORDIC,CUSTOM} from '../dist/ninebot.js?v=15';
 
 test('device chooser filters Ninebot services by default and can list every device',async()=>{
  const nav=Object.getOwnPropertyDescriptor(globalThis,'navigator'),seen=[];
@@ -15,13 +15,15 @@ test('device chooser filters Ninebot services by default and can list every devi
 });
 
 class Element extends EventTarget {
- constructor(){super();this.value='';this.dataset={};this.disabled=false;this.hidden=false;this.checked=false;this.textContent='';}
+ constructor(){super();this.value='';this.dataset={};this.disabled=false;this.hidden=false;this.checked=false;this.textContent='';this.children=[];}
  setAttribute(k,v){this[k]=v;}
+ appendChild(c){this.children.push(c);return c;}
+ replaceChildren(...n){this.children=n;}
 }
 test('a non-G3 scooter (e.g. F3) connects and reads, but settings stay locked',async()=>{
  const ids=[...(await readFile(new URL('../dist/index.html',import.meta.url),'utf8')).matchAll(/id="([^"]+)"/g)].map(m=>m[1]);
  const nodes=new Map(ids.map(id=>[id,new Element()])),doc=new EventTarget(),radios=[1,2,3].map(v=>Object.assign(new Element(),{value:String(v)}));
- doc.getElementById=id=>nodes.get(id);doc.querySelectorAll=()=>radios;doc.querySelector=()=>radios.find(r=>r.checked)||null;
+ doc.getElementById=id=>nodes.get(id);doc.querySelectorAll=()=>radios;doc.querySelector=()=>radios.find(r=>r.checked)||null;doc.createElement=()=>new Element();
  const names=['document','window','navigator','localStorage','sessionStorage'],old=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));
  const methods=['connect','readAcceleration','readRangeDisplay','choose'],original=new Map(methods.map(n=>[n,Ninebot.prototype[n]]));
  const chooseArgs=[],win=Object.assign(new EventTarget(),{isSecureContext:true,location:{hash:'',pathname:'/',search:''}});

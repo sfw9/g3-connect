@@ -1,0 +1,179 @@
+{
+  "firmware_sha256": "01a831c5aa061a5c9acbc42093b56e9e38e38bf1ed53f2fabc4e66a0e32d4105",
+  "ble_sha256": "f73ddd0b8b8fb48f6d66ea816a5cb0f2770b345808d730b84c2c33d7eff21d4f",
+  "boundary": "Stock BLE 0.4.5 post-auth clear dispatcher and serializer -> actual ported VCU per-byte UART parser and reply serializer; GATT/session/radio and low-level flash/peripherals modeled separately.",
+  "vectors": [
+    {
+      "name": "version",
+      "command": 1,
+      "index": 23,
+      "payload": [
+        2
+      ],
+      "clear": "5aa5013e16011702",
+      "uart": "5aa5013e1601170290ff",
+      "reply": "5aa502163e041703aae1fe",
+      "replyClear": "5aa502163e041703aa"
+    },
+    {
+      "name": "normal-status",
+      "command": 1,
+      "index": 29,
+      "payload": [
+        2
+      ],
+      "clear": "5aa5013e16011d02",
+      "uart": "5aa5013e16011d028aff",
+      "reply": "5aa502163e041d000088ff",
+      "replyClear": "5aa502163e041d0000"
+    },
+    {
+      "name": "read-sequence",
+      "command": 241,
+      "index": 0,
+      "payload": [],
+      "clear": "5aa5003e16f100",
+      "uart": "5aa5003e16f100bafe",
+      "reply": "5aa514163ef400010101010102020202020000000000000000000094fe",
+      "replyClear": "5aa514163ef4000101010101020202020200000000000000000000"
+    },
+    {
+      "name": "read-settings",
+      "command": 241,
+      "index": 1,
+      "payload": [],
+      "clear": "5aa5003e16f101",
+      "uart": "5aa5003e16f101b9fe",
+      "reply": "5aa510163ef4011616002d1616002d0001000100010101effd",
+      "replyClear": "5aa510163ef4011616002d1616002d0001000100010101"
+    },
+    {
+      "name": "write-sequence",
+      "command": 242,
+      "index": 0,
+      "payload": [
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "clear": "5aa5143e16f2000102040506070800000000000000000000000000",
+      "uart": "5aa5143e16f200010204050607080000000000000000000000000084fe",
+      "reply": "5aa500163ef500b6fe",
+      "replyClear": "5aa500163ef500"
+    },
+    {
+      "name": "read-sequence-after-write",
+      "command": 241,
+      "index": 0,
+      "payload": [],
+      "clear": "5aa5003e16f100",
+      "uart": "5aa5003e16f100bafe",
+      "reply": "5aa514163ef400010204050607080000000000000000000000000082fe",
+      "replyClear": "5aa514163ef4000102040506070800000000000000000000000000"
+    },
+    {
+      "name": "write-settings",
+      "command": 242,
+      "index": 1,
+      "payload": [
+        10,
+        22,
+        0,
+        42,
+        22,
+        22,
+        0,
+        45,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "clear": "5aa5103e16f2010a16002a1616002d0101000000010101",
+      "uart": "5aa5103e16f2010a16002a1616002d010100000001010100fe",
+      "reply": "5aa500163ef501b5fe",
+      "replyClear": "5aa500163ef501"
+    },
+    {
+      "name": "read-settings-after-write",
+      "command": 241,
+      "index": 1,
+      "payload": [],
+      "clear": "5aa5003e16f101",
+      "uart": "5aa5003e16f101b9fe",
+      "reply": "5aa510163ef4010a16002a1616002d0101000000010101fefd",
+      "replyClear": "5aa510163ef4010a16002a1616002d0101000000010101"
+    },
+    {
+      "name": "reject-short-sequence",
+      "command": 242,
+      "index": 0,
+      "payload": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "clear": "5aa5133e16f20000000000000000000000000000000000000000",
+      "uart": "5aa5133e16f20000000000000000000000000000000000000000a6fe",
+      "reply": null,
+      "replyClear": null
+    },
+    {
+      "name": "reject-selector-two",
+      "command": 241,
+      "index": 2,
+      "payload": [],
+      "clear": "5aa5003e16f102",
+      "uart": "5aa5003e16f102b8fe",
+      "reply": null,
+      "replyClear": null
+    },
+    {
+      "name": "reject-UART-checksum",
+      "command": 241,
+      "index": 0,
+      "payload": [],
+      "clear": "5aa5003e16f100",
+      "uart": "5aa5003e16f100baff",
+      "reply": null,
+      "replyClear": null
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Dependencies
+/node_modules/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+
+# Claude Code / harness tooling (not part of the app)
+/.claude/
+/.agents/
+/skills-lock.json
+
+# Reverse-engineering captures — a HAR can hold session tokens and personal data; keep local
+/1dragon*.txt
+
+# Capacitor Android: the native project source IS committed; its generated output is not
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/build/
+/android/app/build/
+/android/capacitor-cordova-android-plugins/build/
+# Web assets + capacitor config are copied into the native project by `npx cap copy`
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json

@@ -17,6 +17,7 @@ The app UI is in German. Also finds the F3 Pro D / F3 D (same display), where se
 | Send test values / manual navigation to the display | ✓ | ✓ |
 | Custom sounds: upload, custom/built-in toggle, button action, play all | ✓ | ✓ |
 | Record all sounds with the microphone (dumper) | ✓ | |
+| Read and configure AA03 CFW profiles and unlock sequence | ✓ | |
 | Logger and diagnostics export | ✓ | ✓ |
 
 ## Quick start
@@ -47,10 +48,14 @@ Upload any audio file (cut to 4 s, converted to 8 kHz mono WAV) to these slots:
 
 The custom button only plays its sound when its action is set to 8 ("play custom sound"). An upload for the button sets this automatically. How it works: [sound-upload-analysis-en.md](dist/sound-upload-analysis-en.md) (German original: [sound-upload-analysis.md](dist/sound-upload-analysis.md)).
 
+## CFW profiles
+
+The web app's **Profile** tab supports the reconstructed AA03 interface in the separate Compat 1.6.2/lizenzcode port. Connect normally, read both blocks first, edit the normal/tuning Sport limits (the G3 has no Race mode, so the Race byte is read-only and written back unchanged; Sport has a 15 km/h floor), underglow, front light bar, cruise control, panic button, beep, and physical unlock sequence, then use **Schreiben + prüfen** while stationary. Re-read after a normal restart to confirm persistence. Exact fields, event IDs, frames, and test boundaries: [profiles-protocol.md](dist/profiles-protocol.md).
+
 ## Safety and limits
 
 - Settings and sounds are only written while the scooter stands still, only on the MAX G3, and every write is checked by reading it back.
-- No firmware updates. No changes to region, speed limit or motor current.
+- No firmware updates, region changes, or motor-current changes. Profile speed-limit writes are exposed only when the VCU answers the F1/F2 profile protocol with valid AA03-layout blocks; the advertised version word is not the gate (the CFW firmware reports a stock-looking version for stealth). Devices whose profile blocks do not decode are read-only.
 - Which acceleration level means "eco", "standard" or "max" is not confirmed, so the app shows plain numbers.
 - Pairing keys are created and stored on your device only. A downloaded key file is sensitive.
 - Pairing with the Power button can replace the key the scooter used before. Newer firmware may reject the protocol.
@@ -64,7 +69,7 @@ The custom button only plays its sound when its action is set to 8 ("play custom
 | `android-bridge/` | Android app source, build and test scripts |
 | `tests/` | Node tests for the web app and shared crypto test vectors |
 
-Analysis documents in `dist/`: [range display](dist/range-display-analysis.md), [navigation](dist/navigation-analysis.md), [custom sounds](dist/sound-upload-analysis-en.md).
+Analysis documents in `dist/`: [range display](dist/range-display-analysis.md), [navigation](dist/navigation-analysis.md), [custom sounds](dist/sound-upload-analysis-en.md), [CFW profiles](dist/profiles-protocol.md).
 
 ## Development
 
