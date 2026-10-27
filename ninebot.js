@@ -1,31 +1,49 @@
-import {Encryption2,FW,frame,FrameBuffer,unhex} from './crypto.js?v=10';
+import {Encryption2,FW,frame,FrameBuffer,unhex} from './crypto.js?v=11';
 import {encodeDistance,encodeInfo,encodeRoad} from './navigation.js?v=10';
 export const NORDIC='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 export const CUSTOM='6e400001-0000-0000-006e-696e65626f74';
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 export class Ninebot {
-  constructor(log=()=>{},status=()=>{},onPairingKey=()=>{}) {this.log=log;this.status=status;this.onPairingKey=onPairingKey;this.pending=null;this.authenticated=false;this.listeners=[];this.rxChain=Promise.resolve();this.buffer=new FrameBuffer();this.session=0;}
+  constructor(log=()=>{},status=()=>{},onPairingKey=()=>{},bluetooth=globalThis.navigator?.bluetooth) {this.log=log;this.status=status;this.onPairingKey=onPairingKey;this.bluetooth=bluetooth;this.pending=null;this.authenticated=false;this.listeners=[];this.rxChain=Promise.resolve();this.buffer=new FrameBuffer();this.session=0;}
   async choose(all=false) {
     // Ninebot scooters are matched by their BLE services; '1C' is the G3 serial prefix.
     // Other models with the same dashboard (e.g. F3 Pro D / F3 D) may advertise neither,
     // so the user can fall back to listing every device.
     const optionalServices=[NORDIC,CUSTOM,'generic_access'];
-    this.device=await navigator.bluetooth.requestDevice(all?{acceptAllDevices:true,optionalServices}:{filters:[{services:[NORDIC]},{services:[CUSTOM]},{namePrefix:'1C'}],optionalServices});
+    const bluetooth=this.bluetooth??globalThis.navigator?.bluetooth;
+    this.device=await bluetooth.requestDevice(all?{acceptAllDevices:true,optionalServices}:{filters:[{services:[NORDIC]},{services:[CUSTOM]},{namePrefix:'1C'}],optionalServices});
     return this.device;
   }
-  async connect(passwordHex='',nameOverride='',{forcePairing=false}={}) {
+  async connect(passwordHex='',nameOverride='') {
     this.cancelled=false;
-    try {return await this.connectOnce(forcePairing?'':passwordHex,nameOverride);}
+    try {return await this.connectOnce(passwordHex,nameOverride);}
     catch(e) {
       if(e.code!=='PAIRING_RESTART_REQUIRED' || this.cancelled)throw e;
       // AUTH has already changed the cipher and consumed counters. Never send
       // SET_PWD in that session, even if GATT still looks connected.
-      this.log('Gespeicherte Kopplung konnte nicht bestätigt werden. GATT und Handshake für eine neue Power-Kopplung neu starten.');
+      this.log('Gespeicherter Schlüssel passt nicht mehr. Automatisch auf eine neue Power-Kopplung umstellen.');
       await this.closeForReconnect();
       if(this.cancelled)throw new Error('Kopplung abgebrochen.');
+      // The scooter needs a moment after a dropped link before it answers a fresh
+      // PRE_COMM; reconnecting at once gets no reply (seen on hardware). Let it settle.
+      const settleMs=this.reconnectSettleMs??3000;
+      if(settleMs)await sleep(settleMs);
+      if(this.cancelled)throw new Error('Kopplung abgebrochen.');
+      // Even after settling, a DIRECT reconnect to the cached handle never gets PRE_COMM
+      // answered (seen on hardware: the link + Nordic UART come back, but the VCU stays silent
+      // through many retries). A fresh LE scan re-discovers the scooter so the next connect
+      // lands on a responsive GATT server — exactly what tapping "Verbinden" does. Re-acquire a
+      // fresh device handle via the transport when it can scan; the browser's Web Bluetooth has
+      // no such hook and reconnects the cached handle as before.
+      if(this.bluetooth?.reacquire){
+        this.status('Roller erneut suchen …');
+        try{this.device=await this.bluetooth.reacquire(this.device);}
+        catch(e){this.log(`Erneute Suche fehlgeschlagen: ${e.message}`);}
+        if(this.cancelled)throw new Error('Kopplung abgebrochen.');
+      }
+      // Re-pair exactly once — no stored key, no reconnect loop.
       this.status('Neue Kopplung vorbereiten …');
-      // Exactly one recovery attempt; no stored key and no reconnect loop.
       return this.connectOnce('',nameOverride);
     }
   }
@@ -124,7 +142,9 @@ export class Ninebot {
     // A failed AUTH must recover in a new GATT connection, not under its cipher.
     if(password && pre.index!==0) {
       try {
-        await this.authenticate(password,epoch);
+        // Short window: a changed scooter key never answers, so fail fast to the
+        // automatic Power-re-pairing below instead of waiting out the full AUTH timeout.
+        await this.authenticate(password,epoch,{timeout:2500});
         this.log('Vorhandene Browser-Kopplung wiederverwendet.');
         return;
       } catch(e) {
@@ -138,7 +158,10 @@ export class Ninebot {
   }
   async registerPassword(name,epoch=this.session,{timeout=60000,retryDelay=500}={}) {
     const password=crypto.getRandomValues(new Uint8Array(16));
+    // SET_KEY goes out under the registration key (name+auth); the vehicle's Power-button
+    // confirmation comes back under the new pairing key (password+auth), so accept both.
     await this.cipher.setKey(encoder.encode(name),this.cipher.auth);
+    await this.cipher.setAltKey(password,this.cipher.auth);
     this.log('Neuen Pairing-Schlüssel erzeugt. Durchgehend auf Power-Bestätigung hören.');
     const deadline=Date.now()+timeout;
     const showWait=()=>this.status(`Power-Taste am Roller kurz drücken · ${Math.max(0,Math.ceil((deadline-Date.now())/1000))} s`);
@@ -154,14 +177,15 @@ export class Ninebot {
     } catch(e) {
       if(e.message.startsWith('Keine Antwort'))throw new Error('Die Power-Bestätigung ist nicht angekommen. Das Protokoll zeigt, ob der Roller antwortet oder ob Antworten verworfen werden. Erneut verbinden; bei weiterhin ausbleibender Bestätigung die Diagnose herunterladen.');
       throw e;
-    } finally {clearInterval(ticker);}
+    } finally {clearInterval(ticker);if(this.cipher)this.cipher.altKey=null;}
   }
-  async authenticate(password,epoch=this.session) {
+  async authenticate(password,epoch=this.session,{timeout=10000,repeatMs=500}={}) {
+    this.cipher.altKey=null;
     await this.cipher.setKey(password,this.cipher.auth);
     const sn=this.serialBytes || new Uint8Array(14);
     if(!this.serialBytes)sn.set(encoder.encode(this.serial).slice(0,14));
     this.status('Sitzung authentifizieren …');
-    const auth=await this.request(this.bleBoard||4,0x5d,0,sn,0x5d,null,10000,{repeatMs:500,acceptIndex:1});
+    const auth=await this.request(this.bleBoard||4,0x5d,0,sn,0x5d,null,timeout,{repeatMs,acceptIndex:1});
     if(epoch!==this.session || !this.server?.connected)throw new Error('Verbindung abgebrochen.');
     if(auth.index!==1)throw new Error('Der Roller hat die Authentifizierung abgelehnt. Bitte erneut koppeln.');
     this.authenticated=true;this.log('Verschlüsselte Sitzung hergestellt.');
@@ -213,6 +237,20 @@ export class Ninebot {
     const r=await this.request(board,1,index,[2],4);
     if(r.payload.length!==2)throw new Error('Unerwartete Registerlänge.');
     return r.payload[0]|r.payload[1]<<8;
+  }
+  async readVcuKey() {
+    // Reads the 16-byte VCU per-device key from the readable parameter slot that the
+    // key-dumper firmware populates: word_20003142[32] = SRAM 0x20003182, filled from
+    // flash 0x08001420 at boot. Board 0x16 = VCU; read() returns a 16-bit word, so
+    // registers 32..39 yield the 16 bytes. Only meaningful with the dumper firmware
+    // flashed; on stock firmware these registers hold unrelated parameter data.
+    if(!this.authenticated)throw new Error('Keine authentifizierte Verbindung.');
+    const key=new Uint8Array(16);
+    for(let i=0;i<8;i++) {
+      const w=await this.read(0x16,32+i);
+      key[i*2]=w&0xff;key[i*2+1]=(w>>8)&0xff;
+    }
+    return key;
   }
   async writeNoReply(board,index,value) {
     return this.sendUnacknowledged(board,3,index,[value&255,value>>>8]);

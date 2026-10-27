@@ -1,10 +1,12 @@
-import {Ninebot} from './ninebot.js?v=11';
+import {Ninebot} from './ninebot.js?v=15';
+import {runtimeBluetooth,isCapacitor} from './ble-env.js?v=1';
 import {installNavigation} from './navigation-ui.js?v=12';
 import {installManualSender} from './manual.js?v=1';
 import {installSoundUI} from './sound-ui.js?v=8';
-import {hex} from './crypto.js?v=10';
+import {installProfilesUI} from './profiles-ui.js?v=1';
+import {hex} from './crypto.js?v=11';
 const $=id=>document.getElementById(id);
-const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null,manual=null,sound=null;
+const logs=[];const started=performance.now();const sessionKeys=new Map();let client=null,busy=false,current=null;let displayDiagnostics=null,rangeDisplay=null,navigation=null,manual=null,sound=null,vcuKey=null,profiles=null;
 function rememberKey(key) {
   const id=client.device.id;sessionKeys.set(id,key);$('pairing-key').value=key;$('pairing-key').dataset.device=id;
   $('save-key').hidden=false;$('new-key-hint').hidden=false;
@@ -15,7 +17,9 @@ function rememberedKey(id) {
   if($('remember-pairing').checked)try{const key=localStorage.getItem('g3-pairing:'+id);if(/^[\da-f]{32}$/i.test(key||''))return key;}catch{}
   return '';
 }
-const supported=window.isSecureContext && !!navigator.bluetooth && !!crypto.subtle;
+// BLE transport: native Web Bluetooth in a browser, the Capacitor shim in the Android app.
+const bt=runtimeBluetooth();
+const supported=(window.isSecureContext||isCapacitor()) && !!bt && !!crypto.subtle;
 function log(message,level='INFO') {
   const safe=String(message).replace(/\b[\da-f]{32}\b/gi,'[Schlüssel entfernt]');
   const time=new Date().toISOString();const elapsed=((performance.now()-started)/1000).toFixed(3);
@@ -35,19 +39,19 @@ function selected(){return Number(document.querySelector('input[name=level]:chec
 function update() {
   const connected=!!client?.authenticated;
   $('connect').disabled=busy||!supported;$('connect').textContent=connected?'Trennen':busy?'Verbindet …':'Verbinden';
-  $('pair-again').disabled=busy||connected||!supported;
   $('connection-chip').textContent=connected?'Verbunden':busy?'Verbindet …':'Offline';
   $('connection-chip').className='chip '+(connected?'online':busy?'busy':'offline');
   $('levels').disabled=!connected||busy||![1,2,3].includes(current)||!writable();
   $('refresh').disabled=!connected||busy;
   $('read-display-diagnostics').disabled=!connected||busy;
+  $('read-vcu-key').disabled=!connected||busy;
   $('read-range').disabled=!connected||busy;
   $('range-enabled').disabled=!connected||busy||!rangeDisplay||!writable();
   $('apply-range').disabled=!connected||busy||!rangeDisplay||!writable()||$('range-enabled').checked===rangeDisplay.enabled;
   $('apply').disabled=!connected||busy||![1,2,3].includes(current)||!writable()||!selected()||selected()===current;
   $('cancel-pairing').hidden=!busy||!client?.device;
   $('pairing-key').disabled=busy||connected;$('name-override').disabled=busy||connected;
-  navigation?.update();manual?.update();sound?.update();
+  navigation?.update();manual?.update();sound?.update();profiles?.update();
 }
 function reset() {current=null;setRangeCurrent(null);$('current-level').textContent='—';$('read-status').textContent='Noch nicht ausgelesen.';$('device-name').textContent='Kein Gerät';$('device-caption').textContent='Nicht verbunden';document.querySelectorAll('[name=level]').forEach(r=>r.checked=false);}
 function setRangeCurrent(value) {
@@ -66,23 +70,23 @@ async function refresh() {
   if(!writable()&&[1,2,3].includes(level))$('read-status').textContent=READ_ONLY;
   if(![1,2,3].includes(level))status('Änderungen gesperrt','Der Roller meldet einen unbekannten Stufenwert. Diese Firmware wird für Änderungen nicht unterstützt.','error');
 }
-async function connect(forcePairing=false) {
+async function connect() {
   if(busy)return;
   if(client?.authenticated){client.disconnect();reset();update();return;}
-  const key=forcePairing?'':$('pairing-key').value.trim();
+  const key=$('pairing-key').value.trim();
   if(key&&!/^[\da-f]{32}$/i.test(key)){status('Pairing-Schlüssel prüfen','Gib genau 32 Hex-Zeichen (0–9, a–f) ein.','error');return;}
   busy=true;reset();update();
-  log(forcePairing?'Neue Power-Kopplung gestartet. Gespeicherter Schlüssel wird für diesen Versuch übersprungen.':'Verbindungsversuch gestartet.');
+  log('Verbindungsversuch gestartet.');
   client=new Ninebot(log,title=>{
     if(title==='Getrennt'){reset();status('Verbindung getrennt','Du kannst den Roller erneut verbinden.');log('Verbindung getrennt.');update();}
     else {const power=title.startsWith('Power-Taste');if(!power)log(title);status(title,power?'Drücke jetzt die Power-Taste einmal kurz. Die App wartet auf die Bestätigung und übernimmt ihren selbst erzeugten Schlüssel.':'Der Pairing-Schlüssel wird von dieser App auf deinem Gerät verwaltet.',power?'attention':'');update();}
-  },password=>rememberKey(hex(password)));
+  },password=>rememberKey(hex(password)),bt);
   try {
     // requestDevice must be invoked directly from this click, before unrelated await.
     await client.choose($('show-all-devices').checked);log('Bluetooth-Gerät ausgewählt.');$('device-name').textContent=client.device.name||'Ninebot-Roller';
     const enteredKey=(!$('pairing-key').dataset.device || $('pairing-key').dataset.device===client.device.id)?key:'';
-    const usedKey=forcePairing?'':enteredKey||rememberedKey(client.device.id);
-    await client.connect(usedKey,$('name-override').value,{forcePairing});
+    const usedKey=enteredKey||rememberedKey(client.device.id);
+    await client.connect(usedKey,$('name-override').value);
     // Show the key in use, not only a freshly paired one, so it can be revealed or saved at any time.
     if(usedKey&&!$('pairing-key').value){$('pairing-key').value=usedKey;$('pairing-key').dataset.device=client.device.id;}
     if($('pairing-key').value)$('save-key').hidden=false;
@@ -100,7 +104,6 @@ async function connect(forcePairing=false) {
   } finally {busy=false;update();}
 }
 $('connect').addEventListener('click',()=>connect());
-$('pair-again').addEventListener('click',()=>connect(true));
 $('cancel-pairing').addEventListener('click',()=>client?.disconnect());
 $('pairing-key').addEventListener('input',()=>delete $('pairing-key').dataset.device);
 $('refresh').addEventListener('click',async()=>{
@@ -119,6 +122,21 @@ $('read-display-diagnostics').addEventListener('click',async()=>{
   } catch(e) {$('display-diagnostic-output').textContent=e.message;log(e.message,'ERROR');}
   finally{busy=false;update();}
 });
+function vcuKeyText(key){const h=hex(key),ascii=Array.from(key,b=>b>=0x20&&b<0x7f?String.fromCharCode(b):'.').join('');return{h,ascii};}
+$('read-vcu-key').addEventListener('click',async()=>{
+  if(busy||!client?.authenticated)return;busy=true;update();vcuKey=null;$('download-vcu-key').hidden=true;
+  $('vcu-key-output').textContent='VCU-Schlüssel wird aus den Registern 32–39 (Board 0x16) gelesen …';
+  try {
+    vcuKey=await client.readVcuKey();
+    const {h,ascii}=vcuKeyText(vcuKey);
+    $('vcu-key-output').textContent=`hex:   ${h}\nascii: ${ascii}`;
+    $('download-vcu-key').hidden=false;
+    // The key is deliberately kept out of the log (log() also redacts 32-hex strings).
+    log('VCU-Schlüssel gelesen. Er steht nur in dieser Ausgabe und im Schlüssel-Download.');
+  } catch(e) {$('vcu-key-output').textContent=e.message;log(e.message,'ERROR');}
+  finally{busy=false;update();}
+});
+$('download-vcu-key').addEventListener('click',()=>{if(!vcuKey)return;const {h,ascii}=vcuKeyText(vcuKey);download(`vcu_key_hex=${h}\nvcu_key_ascii=${ascii}\n`,'vcu-key.txt','text/plain');});
 $('levels').addEventListener('change',update);
 $('range-enabled').addEventListener('change',update);
 $('read-range').addEventListener('click',async()=>{
@@ -157,6 +175,7 @@ window.addEventListener('pagehide',()=>client?.disconnect());
 navigation=installNavigation({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log});
 sound=installSoundUI({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log,writable});
 manual=installManualSender({getClient:()=>client,isBusy:()=>busy,setBusy:value=>{busy=value;update();},log,beforeStart:()=>navigation.stop('Navigation für Testwerte beendet.')});
+profiles=installProfilesUI({getClient:()=>client,isBusy:()=>busy||!!manual?.active(),setBusy:value=>{busy=value;update();},log,writable});
 log('G3 Logger gestartet.');
 log(`Browser: ${navigator.userAgent}`);
 log(`HTTPS/localhost: ${window.isSecureContext}; Web Bluetooth: ${!!navigator.bluetooth}; WebCrypto: ${!!crypto.subtle}.`);
